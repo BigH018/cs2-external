@@ -48,6 +48,10 @@ What that means in practice:
 7. At the end of the task:
    1. Build Debug|x64 **and** Release|x64 with **zero warnings** (`/W4 /WX` makes warnings errors anyway).
       Run the unit tests (once the tests project exists).
+      **If `cs2_external.exe` is running** (it locks `bin\<Config>\cs2_external.exe`, LNK1104), **force-close it
+      and build**: `Get-Process cs2_external -ErrorAction SilentlyContinue | Stop-Process -Force`. Standing
+      permission from the user (2026-10-06); don't ask, don't build into a scratch folder instead. Only our tool,
+      never `cs2.exe`. Say in the summary that it was closed.
    2. Summarise what changed, then tell the user **exactly** what to do in-game to test it and what they should see.
    3. Update the phase checkboxes (§13), **Current status** (§14), the **Decision log** (§15), the file tree (§5),
       any gotchas you learned (§10), `docs/offsets.md`, and add a dated entry to `docs/DEVLOG.md`.
@@ -810,6 +814,11 @@ matrix is sane before and during a frame.
 - [ ] ESP page: 2D box, corner box, head circle, skeleton (optional), name, health bar/number, distance, weapon
       name, snaplines (origin choice), team mode, enemies only, colours with opacity, thickness
 - [ ] Scoped indicator: a "SCOPED" tag on bots with `m_bIsScoped` set (option on the ESP page)
+- [ ] **Before building any visibility check, stop and remind the user of the three options and let them choose**
+      (they asked for this on 2026-10-06): (1) the game's own trace = internal, out of scope; (2) the spotted-by
+      mask = external, no map geometry, cheap, but slightly delayed and "spotted" rather than per-pixel visible;
+      (3) our own ray cast against the map's collision mesh parsed from the game files = external, exact and
+      per-frame, but a big project (Valve file formats, a BVH, no moving doors/props). Default plan is (2).
 - [ ] Visible / hidden colours from the spotted-by heuristic (`game/visibility`: `is_spotted_by(pawn, local slot)`,
       tested against FakeMemory)
 - [ ] Builds with zero warnings (Debug + Release); tests pass
