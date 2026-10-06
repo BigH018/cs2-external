@@ -5,6 +5,7 @@
 
 #include "config.h"
 #include "features/feature_summary.h"
+#include "game/weapon.h"
 #include "ui/pages/pages.h"
 #include "ui/widgets.h"
 
@@ -15,6 +16,37 @@ namespace
 std::string module_text(const core::ModuleInfo& module)
 {
     return std::format("0x{:X}  (size 0x{:X})", module.base, module.size);
+}
+
+// Map, players and the local player, from the ~4 Hz snapshot.
+void draw_match(const game::GameSnapshot& snapshot)
+{
+    if (!snapshot.in_match)
+    {
+        return;
+    }
+    widgets::info_row("Map", snapshot.globals.map_name.empty() ? "?" : snapshot.globals.map_name.c_str());
+    int alive = 0;
+    for (const game::PlayerSnapshot& player : snapshot.players)
+    {
+        alive += player.alive ? 1 : 0;
+    }
+    widgets::info_row("Players", std::format("{} in the match, {} alive", snapshot.players.size(), alive).c_str());
+    if (const game::PlayerSnapshot* local = snapshot.local(); local != nullptr)
+    {
+        std::string you = std::format("{}  ({})", local->name, game::team_short_name(local->team));
+        if (local->alive)
+        {
+            const std::string_view weapon =
+                local->weapon_id ? game::weapon_info(*local->weapon_id).name : std::string_view{};
+            you += std::format("  {} HP  {}", local->health, weapon.empty() ? "-" : weapon);
+        }
+        else
+        {
+            you += "  dead";
+        }
+        widgets::info_row("You", you.c_str());
+    }
 }
 
 void draw_status(PageContext& ctx)
@@ -50,6 +82,7 @@ void draw_status(PageContext& ctx)
     else
     {
         widgets::info_row("Match", std::format("in a match  (local pawn 0x{:X})", app.local_pawn).c_str(), theme::kOk);
+        draw_match(app.snapshot);
     }
     const std::string active = features::feature_summary(app.active);
     widgets::info_row("Active", active.empty() ? "no features on" : active.c_str(),

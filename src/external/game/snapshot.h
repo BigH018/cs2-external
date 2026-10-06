@@ -1,0 +1,89 @@
+#pragma once
+
+// Plain copies of game state, taken once per read. Features and the UI only ever see these, never game pointers
+// (the pointers here are for game/ code and the debug views, not to be dereferenced elsewhere).
+//
+// PURE: no <Windows.h>.
+
+#include <cstdint>
+#include <optional>
+#include <string>
+#include <vector>
+
+#include "game/globals.h"
+#include "maths/projection.h"
+#include "maths/vec.h"
+
+namespace game
+{
+enum class Team : std::uint8_t
+{
+    none = 0,
+    spectator = 1,
+    terrorist = 2,
+    counter_terrorist = 3,
+};
+
+// m_fFlags bits (Source engine player flags).
+inline constexpr std::uint32_t kFlagOnGround = 1u << 0;
+
+struct PlayerSnapshot
+{
+    std::uint32_t index = 0;       // controller entity index; player slot = index - 1
+    std::uintptr_t controller = 0;
+    std::uintptr_t pawn = 0;       // 0 if the controller has no pawn right now
+    bool is_local = false;
+
+    std::string name;
+    Team team = Team::none;
+
+    // From the pawn (zero / false if there is none).
+    bool alive = false;            // controller says so, life state 0, health > 0
+    std::int32_t health = 0;
+    std::int32_t armor = 0;
+    maths::Vec3 origin;            // feet
+    maths::Vec3 view_offset;       // eye height above the feet
+    bool dormant = false;
+    std::uint32_t flags = 0;       // m_fFlags (bit 0 = on the ground)
+    bool scoped = false;
+    std::optional<std::uint16_t> weapon_id;
+
+    [[nodiscard]] maths::Vec3 eye_position() const noexcept { return origin + view_offset; }
+    [[nodiscard]] bool on_ground() const noexcept { return (flags & kFlagOnGround) != 0; }
+};
+
+// Everything one read of the game produced.
+struct GameSnapshot
+{
+    bool in_match = false;              // the local player's controller exists
+    GlobalVars globals;
+    std::optional<maths::ViewMatrix> view; // only when is_sane()
+    std::vector<PlayerSnapshot> players; // every controller, the local player included, in index order
+
+    // The local player, or nullptr if they aren't in the list.
+    [[nodiscard]] const PlayerSnapshot* local() const noexcept
+    {
+        for (const PlayerSnapshot& player : players)
+        {
+            if (player.is_local)
+            {
+                return &player;
+            }
+        }
+        return nullptr;
+    }
+};
+
+// "T", "CT", "SPEC", "-".
+[[nodiscard]] constexpr const char* team_short_name(Team team) noexcept
+{
+    switch (team)
+    {
+    case Team::terrorist: return "T";
+    case Team::counter_terrorist: return "CT";
+    case Team::spectator: return "SPEC";
+    case Team::none: break;
+    }
+    return "-";
+}
+} // namespace game

@@ -59,6 +59,7 @@
   </ItemDefinitionGroup>
 
   <ItemGroup>
+    <ClInclude Include="helpers\fake_entities.h" />
     <ClInclude Include="helpers\fake_memory.h" />
     <ClInclude Include="helpers\fake_pe.h" />
   </ItemGroup>
@@ -69,11 +70,17 @@
     <ClCompile Include="core\test_pattern.cpp" />
     <ClCompile Include="core\test_pe.cpp" />
     <ClCompile Include="core\test_process_memory.cpp" />
+    <ClCompile Include="game\test_entities.cpp" />
+    <ClCompile Include="game\test_globals.cpp" />
+    <ClCompile Include="game\test_handle.cpp" />
     <ClCompile Include="game\test_interfaces.cpp" />
     <ClCompile Include="game\test_offsets.cpp" />
     <ClCompile Include="game\test_player.cpp" />
     <ClCompile Include="game\test_schema_system.cpp" />
     <ClCompile Include="game\test_signatures.cpp" />
+    <ClCompile Include="game\test_view.cpp" />
+    <ClCompile Include="game\test_weapon.cpp" />
+    <ClCompile Include="maths\test_vec.cpp" />
     <ClCompile Include="features\test_feature_summary.cpp" />
   </ItemGroup>
   <ItemGroup Label="Sources under test">
@@ -81,10 +88,15 @@
     <ClCompile Include="..\src\external\core\pattern.cpp" />
     <ClCompile Include="..\src\external\core\pe.cpp" />
     <ClCompile Include="..\src\external\core\process_memory.cpp" />
+    <ClCompile Include="..\src\external\game\entities.cpp" />
+    <ClCompile Include="..\src\external\game\globals.cpp" />
+    <ClCompile Include="..\src\external\game\handle.cpp" />
     <ClCompile Include="..\src\external\game\interfaces.cpp" />
     <ClCompile Include="..\src\external\game\player.cpp" />
     <ClCompile Include="..\src\external\game\schema_system.cpp" />
     <ClCompile Include="..\src\external\game\signatures.cpp" />
+    <ClCompile Include="..\src\external\game\view.cpp" />
+    <ClCompile Include="..\src\external\game\weapon.cpp" />
     <ClCompile Include="..\src\external\features\feature_summary.cpp" />
   </ItemGroup>
 

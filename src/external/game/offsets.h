@@ -198,5 +198,40 @@ inline constexpr std::size_t kClassInfoReadSize = 0x58;
 inline constexpr std::uintptr_t kFieldName = 0x0;
 inline constexpr std::uintptr_t kFieldOffset = 0x10;
 inline constexpr std::size_t kFieldStride = 0x20;
+
+// --- The entity system (client.dll + dwEntityList) ---
+// Proven 2026-10-06 (build 14189): the local player's weapon handle resolved by hand (Phase 2), then all 20 players of
+// a bot match walked by index (Phase 3). An entity's index picks a chunk of 512 identities; chunk pointers start at
+// +0x10. An identity (CEntityIdentity) is 0x70 bytes: entity pointer at +0x0, the entity's whole handle at +0x10
+// (index | serial << 15), designer name ("cs_player_controller", "weapon_ak47") at +0x20.
+inline constexpr std::uintptr_t kEntityChunks = 0x10;
+inline constexpr std::uint32_t kEntityChunkShift = 9;      // index >> 9 = chunk
+inline constexpr std::uint32_t kEntityChunkMask = 0x1FF;   // index & 0x1FF = slot inside the chunk
+inline constexpr std::size_t kEntityChunkCount = 64;       // 64 * 512 = every index a 15-bit handle can hold
+inline constexpr std::size_t kIdentitySize = 0x70;
+inline constexpr std::uintptr_t kIdentityEntity = 0x0;
+inline constexpr std::uintptr_t kIdentityHandle = 0x10;
+inline constexpr std::uintptr_t kIdentityDesignerName = 0x20;
+
+// CHandle (uint32): the entity index in the low 15 bits, a serial above them. 0xFFFFFFFF = no entity.
+inline constexpr std::uint32_t kHandleIndexMask = 0x7FFF;
+inline constexpr std::uint32_t kInvalidHandle = 0xFFFFFFFF;
+
+// Player controllers sit at entity indices 1..maxClients (slot = index - 1). Their designer name is the check.
+// Proven 2026-10-06: 20 players at indices 1..20, all "cs_player_controller".
+inline constexpr std::string_view kPlayerControllerDesignerName = "cs_player_controller";
+
+// --- CGlobalVars (client.dll + dwGlobalVars -> CGlobalVars*) ---
+// Proven 2026-10-06 (build 14189) by sampling the struct twice, 2 s apart, in a bot match: realtime and curtime both
+// advanced by 2.0, tickcount by 128 (64 tick), curtime = tickcount * interval_per_tick, maxClients read 64, the map
+// name read "de_mirage". (The "typical" layout CLAUDE.md used to give, curtime at +0x10, is wrong for this build.)
+inline constexpr std::uintptr_t kGlobalsRealtime = 0x0;        // float, seconds since the game started
+inline constexpr std::uintptr_t kGlobalsFrameCount = 0x4;      // int32
+inline constexpr std::uintptr_t kGlobalsMaxClients = 0x10;     // int32
+inline constexpr std::uintptr_t kGlobalsIntervalPerTick = 0x1C; // float (1/64)
+inline constexpr std::uintptr_t kGlobalsCurtime = 0x30;        // float, game time
+inline constexpr std::uintptr_t kGlobalsTickCount = 0x44;      // int32
+inline constexpr std::uintptr_t kGlobalsMapName = 0x188;       // const char*, "de_mirage"
+inline constexpr std::size_t kGlobalsReadSize = 0x190;         // one read covers every field above
 } // namespace layout
 } // namespace game::offsets

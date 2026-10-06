@@ -7,6 +7,7 @@
 
 #include "core/process.h"
 #include "features/feature_summary.h"
+#include "game/snapshot.h"
 
 namespace app
 {
@@ -52,6 +53,7 @@ struct AppState
     // Match status, refreshed every config::kStatusIntervalMs while the overlay is visible.
     bool pawn_read_ok = false;
     std::uintptr_t local_pawn = 0; // 0 = no local pawn (main menu, loading screen)
+    game::GameSnapshot snapshot;   // every player, globals, view matrix (Phase 3: for the Home page)
 
     int overlay_width = 0; // the game's client area, which the overlay covers
     int overlay_height = 0;

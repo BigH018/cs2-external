@@ -7,6 +7,7 @@
 
 #include "app/diagnostics.h"
 #include "app/frame.h"
+#include "app/live_view.h"
 #include "config.h"
 #include "core/log.h"
 #include "core/memory.h"
@@ -47,9 +48,26 @@ BOOL WINAPI on_console_event(DWORD event) noexcept
     return TRUE;
 }
 
-int run(bool diagnose_only)
+enum class Mode
 {
-    logger::info("CS2 External - Phase 2 (offline only: -insecure, bots, never a VAC server)");
+    overlay,  // the normal run: diagnostic, then the overlay
+    diagnose, // --diag: the diagnostic only
+    live,     // --live: the console live view only
+};
+
+Mode parse_mode(int argc, char* argv[])
+{
+    const std::string_view flag = argc > 1 ? argv[1] : "";
+    if (flag == config::kDiagnoseFlag)
+    {
+        return Mode::diagnose;
+    }
+    return flag == config::kLiveViewFlag ? Mode::live : Mode::overlay;
+}
+
+int run(Mode mode)
+{
+    logger::info("CS2 External - Phase 3 (offline only: -insecure, bots, never a VAC server)");
 
     const auto pid = core::find_process(config::kGameExe);
     if (!pid)
@@ -103,8 +121,13 @@ int run(bool diagnose_only)
         logger::info("local pawn   0x{:X}", *pawn);
     }
 
+    if (mode == Mode::live)
+    {
+        return app::run_live_view(memory, opened.handle.get(), *client);
+    }
+
     const app::OffsetReport offsets = app::run_diagnostics(memory, *pid, *client, *engine);
-    if (diagnose_only)
+    if (mode == Mode::diagnose)
     {
         return offsets.ok() ? 0 : 2;
     }
@@ -123,8 +146,7 @@ int main(int argc, char* argv[])
     int exit_code = 1;
     try
     {
-        const bool diagnose_only = argc > 1 && std::string_view(argv[1]) == config::kDiagnoseFlag;
-        exit_code = run(diagnose_only);
+        exit_code = run(parse_mode(argc, argv));
     }
     catch (const std::exception& e)
     {

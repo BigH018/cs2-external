@@ -198,6 +198,7 @@ private:
         const auto pawn = game::read_local_pawn(ctx_.memory, ctx_.client.base);
         state_.pawn_read_ok = pawn.has_value();
         state_.local_pawn = pawn.value_or(0);
+        state_.snapshot = game::read_game(ctx_.memory, ctx_.client.base);
         if (state_.in_match() != was_in_match)
         {
             if (state_.in_match())

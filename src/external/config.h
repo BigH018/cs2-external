@@ -44,6 +44,14 @@ inline constexpr std::size_t kMaxInterfaces = 512;         // InterfaceReg list 
 inline constexpr std::size_t kMaxSchemaFields = 4096;      // per class (C_CSPlayerPawn has 104)
 inline constexpr std::size_t kMaxNameLength = 256;         // interface, class and field names
 
+// --- Game reads (Phase 3) ------------------------------------------------------------------------------------------
+// `cs2_external.exe --live` prints a console table of every player (no overlay), refreshed every kLiveViewIntervalMs.
+inline constexpr std::string_view kLiveViewFlag = "--live";
+inline constexpr std::uint32_t kLiveViewIntervalMs = 250;
+inline constexpr std::uint32_t kMaxPlayers = 64;          // player controllers live at entity indices 1..64
+inline constexpr std::size_t kPlayerNameLength = 128;     // CBasePlayerController::m_iszPlayerName is char[128]
+inline constexpr std::int32_t kMaxSaneHealth = 10000;     // more than this = a garbage read
+
 // --- Keys ----------------------------------------------------------------------------------------------------------
 // Temporary hard-coded menu key until the Phase 7 keybind engine. Virtual-key code VK_INSERT (no <Windows.h> here).
 inline constexpr std::uint32_t kMenuToggleKey = 0x2D;
