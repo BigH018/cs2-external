@@ -90,3 +90,31 @@ TEST_CASE("Memory: implausible requests never reach the implementation")
     CHECK(memory.read_count() == 0);
     CHECK(memory.write_count() == 0);
 }
+
+TEST_CASE("read_string: up to the terminator, within max_length")
+{
+    test::FakeMemory memory;
+    memory.map(0x200000, 0x100);
+    memory.put_string(0x200000, "SchemaSystem_001");
+    memory.put_string(0x200040, "");
+
+    CHECK(core::read_string(memory, 0x200000, 64) == "SchemaSystem_001");
+    CHECK(core::read_string(memory, 0x200000, 17) == "SchemaSystem_001"); // 16 characters + terminator
+    CHECK_FALSE(core::read_string(memory, 0x200000, 16).has_value());      // no terminator within 16
+    CHECK(core::read_string(memory, 0x200040, 64) == "");
+    CHECK_FALSE(core::read_string(memory, 0x300000, 64).has_value());      // unmapped
+}
+
+TEST_CASE("read_string: a string at the very end of the last mapped page still reads")
+{
+    // Mapped up to a page boundary and nothing after it, like a string at the end of a module's .rdata. One 256-byte
+    // read would fail; read_string reads up to the page end first.
+    test::FakeMemory memory;
+    memory.map(0x200000, 0x1000);
+    memory.put_string(0x200FF8, "client"); // 6 characters + NUL end at 0x200FFF
+    CHECK(core::read_string(memory, 0x200FF8, 256) == "client");
+
+    // A string that runs over the boundary into memory that isn't there: no terminator, nullopt.
+    memory.put_bytes(0x200FFC, "abcd", 4);
+    CHECK_FALSE(core::read_string(memory, 0x200FFC, 256).has_value());
+}

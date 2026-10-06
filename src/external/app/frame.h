@@ -8,6 +8,7 @@
 
 #include <Windows.h>
 
+#include "app/state.h"
 #include "core/memory.h"
 #include "core/process.h"
 
@@ -21,6 +22,7 @@ struct Context
     const core::Memory& memory;
     core::ModuleInfo client;
     core::ModuleInfo engine;
+    OffsetReport offsets; // the startup diagnostic's result, for the Home page
 };
 
 // Runs the overlay until the user exits (core::shutdown_requested or Alt+F4 on the menu), the game closes, or the

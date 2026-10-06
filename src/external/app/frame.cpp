@@ -35,6 +35,7 @@ public:
     explicit Runner(const Context& ctx) : ctx_(ctx)
     {
         state_.game = GameInfo{ctx.pid, ctx.client, ctx.engine};
+        state_.offsets = ctx.offsets;
     }
 
     int run()

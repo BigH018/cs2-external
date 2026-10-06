@@ -60,19 +60,31 @@
 
   <ItemGroup>
     <ClInclude Include="helpers\fake_memory.h" />
+    <ClInclude Include="helpers\fake_pe.h" />
   </ItemGroup>
   <ItemGroup Label="Tests">
     <!-- Test files, mirroring the src/external layout. -->
     <ClCompile Include="main.cpp" />
     <ClCompile Include="core\test_memory.cpp" />
+    <ClCompile Include="core\test_pattern.cpp" />
+    <ClCompile Include="core\test_pe.cpp" />
     <ClCompile Include="core\test_process_memory.cpp" />
+    <ClCompile Include="game\test_interfaces.cpp" />
+    <ClCompile Include="game\test_offsets.cpp" />
     <ClCompile Include="game\test_player.cpp" />
+    <ClCompile Include="game\test_schema_system.cpp" />
+    <ClCompile Include="game\test_signatures.cpp" />
     <ClCompile Include="features\test_feature_summary.cpp" />
   </ItemGroup>
   <ItemGroup Label="Sources under test">
     <!-- Compiled straight from src/external (pure modules + core/process_memory). -->
+    <ClCompile Include="..\src\external\core\pattern.cpp" />
+    <ClCompile Include="..\src\external\core\pe.cpp" />
     <ClCompile Include="..\src\external\core\process_memory.cpp" />
+    <ClCompile Include="..\src\external\game\interfaces.cpp" />
     <ClCompile Include="..\src\external\game\player.cpp" />
+    <ClCompile Include="..\src\external\game\schema_system.cpp" />
+    <ClCompile Include="..\src\external\game\signatures.cpp" />
     <ClCompile Include="..\src\external\features\feature_summary.cpp" />
   </ItemGroup>
 

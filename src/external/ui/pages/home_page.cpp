@@ -24,6 +24,21 @@ void draw_status(PageContext& ctx)
     widgets::info_row("Game", std::format("cs2.exe  (PID {})", app.game.pid).c_str());
     widgets::info_row("client.dll", module_text(app.game.client).c_str());
     widgets::info_row("engine2.dll", module_text(app.game.engine).c_str());
+    const app::OffsetReport& offsets = app.offsets;
+    if (offsets.ok())
+    {
+        widgets::info_row("Offsets",
+                          std::format("build {}: all {} checks OK", offsets.game_build, offsets.checks).c_str(),
+                          theme::kOk);
+    }
+    else if (offsets.ran)
+    {
+        widgets::info_row("Offsets",
+                          std::format("build {}: {} of {} checks failed (see the console)", offsets.game_build,
+                                      offsets.failures, offsets.checks)
+                              .c_str(),
+                          theme::kWarn);
+    }
     if (!app.pawn_read_ok)
     {
         widgets::info_row("Match", "local pawn read failed", theme::kWarn);

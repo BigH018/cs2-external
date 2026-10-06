@@ -7,9 +7,12 @@
 //
 // PURE: no <Windows.h>.
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
+#include <string_view>
 #include <type_traits>
 
 #include "config.h"
@@ -94,4 +97,32 @@ private:
     [[nodiscard]] virtual bool do_read(std::uintptr_t address, void* buffer, std::size_t size) const noexcept = 0;
     [[nodiscard]] virtual bool do_write(std::uintptr_t address, const void* buffer, std::size_t size) noexcept = 0;
 };
+
+// Reads a NUL-terminated string of at most `max_length` characters at `address`. Reads never cross a page boundary
+// in one go, so a short string at the very end of a mapped page still reads. nullopt if a read fails or there is no
+// terminator within `max_length`.
+[[nodiscard]] inline std::optional<std::string> read_string(const Memory& memory, std::uintptr_t address,
+                                                            std::size_t max_length)
+{
+    std::string text;
+    char chunk[config::kPageSize];
+    while (text.size() < max_length)
+    {
+        const std::uintptr_t at = address + text.size();
+        const std::size_t to_page_end = config::kPageSize - at % config::kPageSize;
+        const std::size_t want = std::min({to_page_end, max_length - text.size(), sizeof(chunk)});
+        if (!memory.read_bytes(at, chunk, want))
+        {
+            return std::nullopt;
+        }
+        const std::string_view got(chunk, want);
+        const std::size_t end = got.find('\0');
+        text.append(got.substr(0, end));
+        if (end != std::string_view::npos)
+        {
+            return text;
+        }
+    }
+    return std::nullopt;
+}
 } // namespace core

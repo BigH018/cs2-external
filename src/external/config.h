@@ -4,6 +4,7 @@
 //
 // PURE: no <Windows.h>.
 
+#include <cstddef>
 #include <cstdint>
 #include <string_view>
 
@@ -22,11 +23,26 @@ inline constexpr wchar_t kOverlayTitle[] = L"External Cheat - overlay";
 // User-mode address range of an x64 Windows process. The first 64 KiB are never mapped.
 inline constexpr std::uintptr_t kMinValidPointer = 0x10000;
 inline constexpr std::uintptr_t kMaxValidPointer = 0x7FFFFFFFFFFF;
+inline constexpr std::size_t kPageSize = 0x1000;
 
 // --- The game and the modules we read from -------------------------------------------------------------------------
 inline constexpr std::wstring_view kGameExe = L"cs2.exe";
 inline constexpr std::wstring_view kClientModule = L"client.dll";
 inline constexpr std::wstring_view kEngineModule = L"engine2.dll";
+inline constexpr std::wstring_view kSchemaSystemModule = L"schemasystem.dll";
+inline constexpr std::wstring_view kInputSystemModule = L"inputsystem.dll";
+// The schema system's names for the client: its type scope, and the module name inside each class's info.
+inline constexpr std::string_view kClientTypeScope = "client.dll";
+inline constexpr std::string_view kClientSchemaModule = "client";
+
+// --- Startup diagnostic (Phase 2) ----------------------------------------------------------------------------------
+// `cs2_external.exe --diag` prints the offset diagnostic and exits (no overlay): the check to run after a CS2 update.
+inline constexpr std::string_view kDiagnoseFlag = "--diag";
+inline constexpr std::size_t kRemoteCopyChunk = 0x100000; // copying a module: 1 MiB per read, page by page on failure
+inline constexpr std::size_t kMaxSignatureHits = 16;       // more matches than this = the pattern is useless
+inline constexpr std::size_t kMaxInterfaces = 512;         // InterfaceReg list walk limit (guards against a loop)
+inline constexpr std::size_t kMaxSchemaFields = 4096;      // per class (C_CSPlayerPawn has 104)
+inline constexpr std::size_t kMaxNameLength = 256;         // interface, class and field names
 
 // --- Keys ----------------------------------------------------------------------------------------------------------
 // Temporary hard-coded menu key until the Phase 7 keybind engine. Virtual-key code VK_INSERT (no <Windows.h> here).

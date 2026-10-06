@@ -5,6 +5,7 @@
 
 #include <Windows.h>
 
+#include "app/diagnostics.h"
 #include "app/frame.h"
 #include "config.h"
 #include "core/log.h"
@@ -46,9 +47,9 @@ BOOL WINAPI on_console_event(DWORD event) noexcept
     return TRUE;
 }
 
-int run()
+int run(bool diagnose_only)
 {
-    logger::info("CS2 External - Phase 1 (offline only: -insecure, bots, never a VAC server)");
+    logger::info("CS2 External - Phase 2 (offline only: -insecure, bots, never a VAC server)");
 
     const auto pid = core::find_process(config::kGameExe);
     if (!pid)
@@ -102,11 +103,17 @@ int run()
         logger::info("local pawn   0x{:X}", *pawn);
     }
 
-    return app::run(app::Context{*pid, opened.handle.get(), memory, *client, *engine});
+    const app::OffsetReport offsets = app::run_diagnostics(memory, *pid, *client, *engine);
+    if (diagnose_only)
+    {
+        return offsets.ok() ? 0 : 2;
+    }
+
+    return app::run(app::Context{*pid, opened.handle.get(), memory, *client, *engine, offsets});
 }
 } // namespace
 
-int main()
+int main(int argc, char* argv[])
 {
     // Before any window exists: overlay coordinates are then physical pixels, the same as the game's client area at
     // any Windows display scaling. Fails harmlessly if a manifest already set it.
@@ -116,7 +123,8 @@ int main()
     int exit_code = 1;
     try
     {
-        exit_code = run();
+        const bool diagnose_only = argc > 1 && std::string_view(argv[1]) == config::kDiagnoseFlag;
+        exit_code = run(diagnose_only);
     }
     catch (const std::exception& e)
     {

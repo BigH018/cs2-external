@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstring>
 #include <map>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -31,6 +32,21 @@ public:
         std::byte* target = find(address, sizeof(T));
         REQUIRE_MESSAGE(target != nullptr, "FakeMemory::put outside every mapped region");
         std::memcpy(target, &value, sizeof(T));
+    }
+
+    // Puts `size` raw bytes at `address` (which must already be mapped). Not counted as a write.
+    void put_bytes(std::uintptr_t address, const void* data, std::size_t size)
+    {
+        std::byte* target = find(address, size);
+        REQUIRE_MESSAGE(target != nullptr, "FakeMemory::put_bytes outside every mapped region");
+        std::memcpy(target, data, size);
+    }
+
+    // Puts `text` and its NUL terminator at `address`.
+    void put_string(std::uintptr_t address, std::string_view text)
+    {
+        put_bytes(address, text.data(), text.size());
+        put<char>(address + text.size(), '\0');
     }
 
     // Maps a region just big enough for `value` and puts it there.

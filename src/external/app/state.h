@@ -18,6 +18,17 @@ struct GameInfo
     core::ModuleInfo engine;
 };
 
+// The startup offset diagnostic's result (app/diagnostics), for the Home page. The details are in the console.
+struct OffsetReport
+{
+    bool ran = false;
+    std::uint32_t game_build = 0; // engine2.dll + dwBuildNumber; 0 = couldn't be read
+    int checks = 0;
+    int failures = 0;
+
+    [[nodiscard]] bool ok() const noexcept { return ran && failures == 0; }
+};
+
 // Options for the overlay itself. Applied live. Phase 6 moves them into settings::Settings, Phase 8 saves them.
 struct OverlayOptions
 {
@@ -28,6 +39,7 @@ struct OverlayOptions
 struct AppState
 {
     GameInfo game;
+    OffsetReport offsets;
     OverlayOptions overlay;
 
     // Which features are on, for the watermark. Filled from the settings by app/frame once features exist
