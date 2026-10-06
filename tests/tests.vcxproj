@@ -1,0 +1,78 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{031B8A3C-6722-43E2-B940-085678088FCD}</ProjectGuid>
+    <RootNamespace>tests</RootNamespace>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)'=='Debug'">
+    <UseDebugLibraries>true</UseDebugLibraries>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)'=='Release'">
+    <UseDebugLibraries>false</UseDebugLibraries>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+
+  <ImportGroup Label="PropertySheets">
+    <Import Project="..\props\common.props" />
+  </ImportGroup>
+
+  <PropertyGroup>
+    <TargetName>tests</TargetName>
+    <!-- doctest is third-party: on the external include path, so its warnings are off. -->
+    <ExternalIncludePath>$(RepoRoot)external\doctest;$(ExternalIncludePath)</ExternalIncludePath>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <!-- tests/ itself is an include root too: #include "helpers/fake_memory.h" -->
+      <AdditionalIncludeDirectories>$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- Make doctest include the real <ostream>/<iosfwd> instead of forward-declaring std types itself, which
+           clashes with MSVC's <string_view> when a project header includes it after doctest.h (C2660/C2027). -->
+      <PreprocessorDefinitions>DOCTEST_CONFIG_USE_STD_HEADERS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <ClInclude Include="helpers\fake_memory.h" />
+  </ItemGroup>
+  <ItemGroup Label="Tests">
+    <!-- Test files, mirroring the src/external layout. -->
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="core\test_memory.cpp" />
+    <ClCompile Include="core\test_process_memory.cpp" />
+    <ClCompile Include="game\test_player.cpp" />
+  </ItemGroup>
+  <ItemGroup Label="Sources under test">
+    <!-- Compiled straight from src/external (pure modules + core/process_memory). -->
+    <ClCompile Include="..\src\external\core\process_memory.cpp" />
+    <ClCompile Include="..\src\external\game\player.cpp" />
+  </ItemGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
