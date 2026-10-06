@@ -133,6 +133,10 @@ gets a line in `external/README.md` (version, licence, source tag, blob hash).
 - Defines: `WIN32`, `_WIN64`, `WIN32_LEAN_AND_MEAN`, `NOMINMAX`, plus `_DEBUG` / `NDEBUG`. Character set: Unicode.
 - Output: `bin\<Configuration>\`. Intermediates: `obj\<Project>\<Configuration>\`. Both git-ignored.
 - `WindowsTargetPlatformVersion` = `10.0` (latest installed Windows SDK; no SDK version pinned).
+- **Import order matters:** `common.props` is imported in the `PropertySheets` ImportGroup **after**
+  `Microsoft.Cpp.props` (otherwise the toolset defaults override it). `WindowsTargetPlatformVersion` and
+  `CharacterSet` must be set **before** `Microsoft.Cpp.props`, so those two (and only those two) live in each
+  `.vcxproj`. Copy that layout for every new project.
 - Solution platform is `x64`.
 - No `.vcxproj.filters` files: use **Solution Explorer → Show All Files**.
 - Change shared settings in `props/common.props`, not in individual projects.
@@ -164,7 +168,9 @@ bin\Release\cs2_external.exe
 - Windows SDK: latest installed (10.0.26100.0 or newer) via `WindowsTargetPlatformVersion 10.0`.
 - **`msbuild` is not on PATH** in the user's terminal. Use the full path above (find with `vswhere`).
 - **Steam** installed, CS2 installed, `-insecure` verified working (no VAC prompt, bots load).
-- **a2x/cs2-dumper** run successfully; output at `docs/dumps/offsets.json` and `docs/dumps/client_dll.json`.
+- **a2x/cs2-dumper** run successfully. Full output (every module, in .cs/.hpp/.json/.rs/.zig) is at
+  `C:\Users\Harry\Desktop\output`; only the JSON files we use are copied into `docs/dumps/`. Copy, never retype.
+- **CS2 test setup:** an offline Deathmatch against bots with the bots frozen (they can't shoot), round time 60 min.
 
 ---
 
@@ -175,108 +181,117 @@ Status markers: ✅ exists, 🔲 planned (phase number in brackets).
 ```
 cs2-external/
   CLAUDE.md                       ✅ this file: project memory and rules
-  README.md                       ✅ [11] educational README
+  README.md                       ✅ stub (full educational README in [11])
   .gitignore                      ✅ VS/C++ build output, .vs, local profiles/logs
   .gitattributes                  ✅ CRLF for VS files, text normalisation
-  cs2-external.sln                ✅ solution: Debug|x64, Release|x64
+  cs2-external.sln                ✅ solution: Debug|x64, Release|x64 (external, tests)
   props/
-    common.props                  ✅ shared build settings (C++20, x64, /W4 /WX, /MT, output dirs)
-    imgui.props                   ✅ ImGui config defines + include paths
+    common.props                  ✅ shared build settings (C++20, /W4 /WX, /MT, output dirs); import AFTER Cpp.props
+    imgui.props                   🔲 [1] ImGui config defines + include paths
   docs/
     DEVLOG.md                     ✅ dated log
     offsets.md                    ✅ running notes on every offset, signature, schema field, with proof
     dumps/
-      offsets.json                ✅ a2x/cs2-dumper output (module globals)
-      client_dll.json             ✅ a2x/cs2-dumper output (schema classes + fields)
-      interfaces.json             ✅ a2x/cs2-dumper output (interface names + vtables)
-      buttons.json                ✅ a2x/cs2-dumper output (button bitflags)
+      info.json                   ✅ a2x/cs2-dumper run info: CS2 build 14189, 2026-10-06T16:04:45Z
+      offsets.json                ✅ a2x/cs2-dumper output (module globals, 29 entries)
+      client_dll.json             ✅ a2x/cs2-dumper output (542 schema classes, 14 enums)
+      interfaces.json             ✅ a2x/cs2-dumper output (111 interfaces across 31 modules)
+      buttons.json                ✅ a2x/cs2-dumper output (16 button globals)
   external/
-    README.md                     ✅ what's vendored, versions, licences
-    vendor.vcxproj                ✅ static lib compiling Dear ImGui
-    imgui/                        ✅ Dear ImGui v1.92.x + Win32 + DX11 backends
-    doctest/                      ✅ doctest v2.5.3
-    nlohmann/                     ✅ nlohmann/json v3.12.0
+    README.md                     ✅ what's vendored, versions, licences, blob hashes
+    vendor.vcxproj                🔲 [1] static lib compiling Dear ImGui
+    imgui/                        🔲 [1] Dear ImGui v1.92.x + Win32 + DX11 backends
+    doctest/                      ✅ doctest v2.5.3 (doctest.h + LICENSE.txt)
+    nlohmann/                     🔲 [8] nlohmann/json v3.12.0
   profiles/
-    default.json                  ✅ [8] mirror of built-in defaults
+    default.json                  🔲 [8] mirror of built-in defaults
   src/
     external/
-      external.vcxproj            ✅ console exe, x64, static CRT
-      main.cpp                    ✅ entry: find cs2.exe → open handle → init overlay → main loop
+      external.vcxproj            ✅ console exe → bin\<Config>\cs2_external.exe, x64, static CRT
+      main.cpp                    ✅ Phase 0: find cs2.exe → read-only handle → print PID, module bases, local pawn
       core/
-        process.h/.cpp            ✅ find_process, open_handle, module_base
-        memory.h/.cpp             ✅ safe_read<T>, safe_write<T>, is_plausible_pointer, RPM/WPM wrappers
-        pattern.h/.cpp            ✅ [2] signature scanner over a remote module
-        log.h                     ✅ logger::info/warn/error
-        runtime.h                 ✅ shared atomics (shutdown_requested)
+        process.h/.cpp            ✅ UniqueHandle, find_process, open_handle, module_base (Toolhelp32)
+        memory.h                  ✅ PURE: is_plausible_pointer/range + core::Memory interface (read_bytes,
+                                     safe_read<T>, read<T>, write_bytes, safe_write<T>)
+        process_memory.h/.cpp     ✅ ProcessMemory : Memory, the only RPM/WPM calls (__try/__except-guarded)
+        pattern.h/.cpp            🔲 [2] signature scanner over a remote module
+        log.h                     ✅ logger::info/warn/error (std::format, stdout)
+        runtime.h                 🔲 [1] shared atomics (shutdown_requested)
       game/                       (THE ONLY place that dereferences game memory)
-        offsets.h                 ✅ module RVAs (from dumps/offsets.json)
-        schema.h                  ✅ class field offsets (from dumps/client_dll.json)
-        interfaces.h/.cpp         ✅ [2] CreateInterface resolution from outside the process
-        structs.h                 ✅ [3] Vec3, PlayerSnapshot, accessor helpers
-        player.h/.cpp             ✅ [3] make_snapshot, validity checks, collect_players
-        entities.h/.cpp           ✅ [3] walk the chunked entity list remotely
-        handle.h/.cpp             ✅ [3] CHandle → entity pointer resolution
-        view.h/.cpp               ✅ [3] view matrix read
-        bones.h/.cpp              ✅ [4] bone array read (needs a self-found offset, see §7)
-        weapon.h/.cpp             ✅ [3] read weapon id / name
-        globals.h/.cpp            ✅ [3] CGlobalVars reads (curtime, maxClients, interval_per_tick)
+        offsets.h                 ✅ module RVAs (from dumps/offsets.json); only dwLocalPlayerPawn so far
+        schema.h                  🔲 [2] class field offsets (from dumps/client_dll.json)
+        interfaces.h/.cpp         🔲 [2] CreateInterface resolution from outside the process
+        structs.h                 🔲 [3] Vec3, PlayerSnapshot, accessor helpers
+        player.h/.cpp             ✅ read_local_pawn (Phase 0); [3] make_snapshot, validity checks, collect_players
+        entities.h/.cpp           🔲 [3] walk the chunked entity list remotely
+        handle.h/.cpp             🔲 [3] CHandle → entity pointer resolution
+        view.h/.cpp               🔲 [3] view matrix read
+        bones.h/.cpp              🔲 [4+] bone array read (needs a self-found offset, see §7)
+        weapon.h/.cpp             🔲 [3] read weapon id / name
+        globals.h/.cpp            🔲 [3] CGlobalVars reads (curtime, maxClients, interval_per_tick)
       maths/                      (PURE)
-        vec.h                     ✅ Vec2, Vec3 + ops
-        angles.h/.cpp             ✅ Angles, normalize, calc_aim_angles, angular_distance, smoothing
-        projection.h/.cpp         ✅ ViewMatrix, world_to_screen (row-major, matching this build)
-        skeleton.h/.cpp           ✅ [4] joint specs, bone index → screen positions
+        vec.h                     🔲 [3] Vec2, Vec3 + ops
+        angles.h/.cpp             🔲 [5] Angles, normalize, calc_aim_angles, angular_distance, smoothing
+        projection.h/.cpp         🔲 [4] ViewMatrix, world_to_screen (row-major, matching this build)
+        skeleton.h/.cpp           🔲 [4+] joint specs, bone index → screen positions
       features/                   (PURE: data in, decisions out)
-        esp.h/.cpp                ✅ health_colour, screen_box, display_name, build_esp → primitives
-        aimbot.h/.cpp             ✅ aim_point, find_candidates, select_target, compute_aim
-        triggerbot.h/.cpp         ✅ Triggerbot state machine
-        player_values.h/.cpp      ✅ [6] plan_writes (health/armour/ammo)
+        esp.h/.cpp                🔲 [4] health_colour, screen_box, display_name, build_esp → primitives
+        aimbot.h/.cpp             🔲 [5] aim_point, find_candidates, select_target, compute_aim
+        triggerbot.h/.cpp         🔲 [5] Triggerbot state machine
+        player_values.h/.cpp      🔲 [6] plan_writes (health/armour/ammo)
       render/
-        primitives.h              ✅ Line, Rect, FilledRect, Circle, Text, Primitive variant (PURE data)
-        painter.h/.cpp            ✅ paint(primitives, font) on ImGui background draw list
+        primitives.h              🔲 [4] Line, Rect, FilledRect, Circle, Text, Primitive variant (PURE data)
+        painter.h/.cpp            🔲 [4] paint(primitives, font) on ImGui background draw list
       input/
-        cursor.h/.cpp             ✅ CursorControl for the overlay window
-        keys.h/.cpp               ✅ VK ↔ names, KeySet
-        actions.h/.cpp            ✅ ActionId registry
-        keybinds.h/.cpp           ✅ HOLD/TOGGLE/PRESS engine
-        key_poll.h/.cpp           ✅ GetAsyncKeyState polling
-        bind_capture.h/.cpp       ✅ bind capture
+        cursor.h/.cpp             🔲 [1] CursorControl for the overlay window
+        keys.h/.cpp               🔲 [7] VK ↔ names, KeySet
+        actions.h/.cpp            🔲 [7] ActionId registry
+        keybinds.h/.cpp           🔲 [7] HOLD/TOGGLE/PRESS engine
+        key_poll.h/.cpp           🔲 [7] GetAsyncKeyState polling
+        bind_capture.h/.cpp       🔲 [7] bind capture
       settings/
-        settings.h                ✅ Settings struct
-        profile_json.h/.cpp       ✅ [8]
-        profile_store.h/.cpp      ✅ [8]
-        presets.h/.cpp            ✅ [8]
+        settings.h                🔲 [6] Settings struct
+        profile_json.h/.cpp       🔲 [8]
+        profile_store.h/.cpp      🔲 [8]
+        presets.h/.cpp            🔲 [8]
       ui/
-        imgui_layer.h/.cpp        ✅ ImGuiLayer: context + Win32 + DX11 backends for the overlay window
-        overlay_window.h/.cpp     ✅ transparent, click-through, topmost window; toggling click-through on INSERT
-        theme.h/.cpp              ✅ palette
-        widgets.h/.cpp            ✅ shared widgets
-        menu.h/.cpp               ✅ sidebar + pages
-        pages/                    ✅ one file per page (home, esp, aimbot, triggerbot, player, misc, settings)
-      color.h                     ✅ Color (RGBA floats)
-      config.h                    ✅ non-offset constants, Range<T> + every setting range
+        imgui_layer.h/.cpp        🔲 [1] ImGuiLayer: context + Win32 + DX11 backends for the overlay window
+        overlay_window.h/.cpp     🔲 [1] transparent, click-through, topmost window; toggling click-through on INSERT
+        theme.h/.cpp              🔲 [1] palette
+        widgets.h/.cpp            🔲 [1] shared widgets
+        menu.h/.cpp               🔲 [1] sidebar + pages
+        pages/                    🔲 [1+] one file per page (home, esp, aimbot, triggerbot, player, misc, settings)
+      color.h                     🔲 [4] Color (RGBA floats)
+      config.h                    ✅ PURE: pointer bounds, process/module names; [1+] Range<T> + every setting range
+      app/                        (the orchestrator, from AC: the only place that wires everything together)
+        frame.h/.cpp              🔲 [1] one frame: input → settings → reads → features → writes → draw
+        state.h                   🔲 [1] AppState (settings, overlay, cached game state)
+        live_view.h/.cpp          🔲 [3] debug console view (~4 Hz) with local player + every bot
   tests/
-    tests.vcxproj                 ✅ console exe (doctest)
+    tests.vcxproj                 ✅ console exe (doctest) → bin\<Config>\tests.exe
     main.cpp                      ✅ DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-    core/test_pattern.cpp         ✅ [2] pattern parse, wildcard match, scan
-    core/test_memory.cpp          ✅ safe_read / safe_write / pointer sanity
-    maths/test_angles.cpp         ✅
-    maths/test_projection.cpp     ✅
-    maths/test_skeleton.cpp       ✅
-    game/test_player.cpp          ✅
-    game/test_entities.cpp        ✅ fake remote reader
-    game/test_handle.cpp          ✅ [3] CHandle resolution
-    features/test_esp.cpp         ✅
-    features/test_aimbot.cpp      ✅
-    features/test_triggerbot.cpp  ✅
-    features/test_player_values.cpp ✅
-    settings/test_settings.cpp    ✅
-    settings/test_profile_json.cpp ✅
-    settings/test_profile_store.cpp ✅
-    settings/test_presets.cpp     ✅
-    input/test_keys.cpp           ✅
-    input/test_keybinds.cpp       ✅
-    input/test_bind_capture.cpp   ✅
-    test_color.cpp                ✅
+    helpers/fake_memory.h         ✅ FakeMemory : core::Memory (mapped regions at fake addresses, read/write counts)
+    core/test_memory.cpp          ✅ pointer checks + Memory's typed wrappers (via FakeMemory)
+    core/test_process_memory.cpp  ✅ ProcessMemory RPM/WPM against our own process (uncommitted page, partial read)
+    game/test_player.cpp          ✅ read_local_pawn (Phase 0); [3] snapshots
+    core/test_pattern.cpp         🔲 [2] pattern parse, wildcard match, scan
+    maths/test_angles.cpp         🔲 [5]
+    maths/test_projection.cpp     🔲 [4]
+    maths/test_skeleton.cpp       🔲 [4+]
+    game/test_entities.cpp        🔲 [3] fake remote reader
+    game/test_handle.cpp          🔲 [3] CHandle resolution
+    features/test_esp.cpp         🔲 [4]
+    features/test_aimbot.cpp      🔲 [5]
+    features/test_triggerbot.cpp  🔲 [5]
+    features/test_player_values.cpp 🔲 [6]
+    settings/test_settings.cpp    🔲 [6]
+    settings/test_profile_json.cpp 🔲 [8]
+    settings/test_profile_store.cpp 🔲 [8]
+    settings/test_presets.cpp     🔲 [8]
+    input/test_keys.cpp           🔲 [7]
+    input/test_keybinds.cpp       🔲 [7]
+    input/test_bind_capture.cpp   🔲 [7]
+    test_color.cpp                🔲 [4]
 ```
 
 ---
@@ -285,7 +300,8 @@ cs2-external/
 
 ### 6.1 Module responsibilities and dependency rules
 - **Pure modules** (no `<Windows.h>`, no ImGui, no raw game pointers): `maths/`, `features/`,
-  `render/primitives.h`, `game/snapshot.h`, `input/keys|actions|keybinds`, `settings/`, `config.h`, `game/offsets.h`,
+  `render/primitives.h`, `game/snapshot.h`, `input/keys|actions|keybinds`, `settings/`, `config.h`,
+  `core/memory.h` (the interface, not the RPM implementation), `game/offsets.h`,
   `game/schema.h`. They take plain data and return plain data, so the `tests` project can compile and test them
   without the game.
 - **`core/`** owns the process handle, memory read/write, pattern scanning, and logging. **No DLL lifetime code**
@@ -296,8 +312,10 @@ cs2-external/
   remotely.
 - **ImGui** is included only in `ui/` and `render/painter`. The UI **never touches game memory**: it edits
   `Settings` and queues requests, and the main loop applies them.
-- **`main.cpp`** is the orchestrator: find the process, init the overlay, run the frame loop (read → features →
-  writes → draw), handle shutdown.
+- **`main.cpp`** is only the bootstrap: find the process, open the handle, build `core::ProcessMemory`, hand over to
+  `app/`, and handle shutdown. (Phase 0 does its single read straight from `main.cpp`.)
+- **`app/frame`** (from Phase 1, same role as in the AC project) is the orchestrator: the only place that wires
+  input, settings, game reads, features, writes and drawing together, one frame at a time.
 
 ### 6.2 Threading model
 | Thread | Who | Allowed to |
@@ -315,7 +333,7 @@ main loop (60+ Hz, or vsync-limited):
   1. pump Win32 messages for the overlay window
   2. keybinds: GetAsyncKeyState → engine → ActionStates
   3. read:    game/ → GameState {local PlayerSnapshot, players, view matrix, globals} (copies)
-              (all reads go through core::safe_read<T>, which is __try/__except-guarded)
+              (all reads go through core::Memory; the real one is ProcessMemory, __try/__except-guarded)
   4. features (pure): aimbot → angles (write via WriteProcessMemory) · player_values → writes · esp → primitives
   5. apply:   game/ writes
   6. draw:    ImGui NewFrame → render/painter(primitives) on background draw list → ui::menu (if open)
@@ -393,7 +411,7 @@ You may change an offset **only if** you:
 ### What the dumper gives you (already in `docs/dumps/`)
 - `offsets.json`: the module globals. 29 offsets across `client.dll`, `engine2.dll`, `inputsystem.dll`,
   `matchmaking.dll`, `soundsystem.dll`. Every `dw*` symbol you'll reference.
-- `client_dll.json`: 3301 classes and 569 enums, with every field offset. This is where health, team, position,
+- `client_dll.json`: 542 classes and 14 enums (build 14189), with every field offset. This is where health, team, position,
   eye angles, weapon handle, player name, and everything else lives.
 - `interfaces.json`: 111 interfaces across 31 modules, with their module and vtable RVA.
 - `buttons.json`: 16 button flags (attack, jump, duck, etc.).
@@ -443,7 +461,7 @@ struct Vec3 { float x, y, z; };
 // are runtime values from the dump, not compile-time constants.
 namespace game::fields {
     std::int32_t health(std::uintptr_t pawn) {
-        return safe_read<std::int32_t>(pawn + schema::base_entity::m_iHealth);
+        return memory.read<std::int32_t>(pawn + schema::base_entity::m_iHealth); // memory: const core::Memory&
     }
     // ...
 }
@@ -463,7 +481,8 @@ Rules:
 - **Players:** valid controller + pawn, alive check (`m_lifeState == 0`), team check.
 - **Entity list:** clamp iteration count; skip nulls, non-players, invalid handles, dormant entities
   (`m_bDormant`).
-- All reads go through `core::safe_read<T>`, which is `__try/__except`-guarded. A bad read returns false, never
+- All reads go through `core::Memory` (`safe_read<T>` / `read<T>`); the real implementation, `ProcessMemory`, is
+  `__try/__except`-guarded. A bad read returns false, never
   crashes our process.
 - **The view matrix can be all zeros** before the first frame of a match: check for sanity before projecting.
 
@@ -478,7 +497,13 @@ Rules:
 
 ## 8. Current behaviour (what exists now)
 
-*(Filled in as phases complete. Starts empty.)*
+*(Filled in as phases complete.)*
+
+- **Phase 0 (done, verified in-game 2026-10-06):** `cs2_external.exe` finds `cs2.exe` (Toolhelp32), opens it with a
+  **read-only** handle (`PROCESS_VM_READ | PROCESS_QUERY_LIMITED_INFORMATION`), prints the PID, the `client.dll` and
+  `engine2.dll` bases and sizes, and the local pawn pointer (`client.dll + dwLocalPlayerPawn`), then waits for Enter.
+  Game closed → `cs2.exe not found` (exit 1). Access denied → tells the user to run as administrator. In the main
+  menu the pawn prints as `none`; a non-plausible value prints a "dwLocalPlayerPawn may be stale" warning.
 
 ---
 
@@ -517,6 +542,15 @@ Rules:
   not.
 - **Don't call `ReadProcessMemory` on a page that might be freed.** A crash in the target is not your fault, but
   a crash in your process is. `safe_read` handles this.
+- **RPM/WPM report a bad remote address through the return value, not an exception.** The `__try/__except` in
+  `core::ProcessMemory::do_read` only protects our side of the copy. Functions containing `__try` must not hold C++
+  objects with destructors (C2712), which is why the guard lives in the non-template `do_read`/`do_write`.
+- **A partial read is a failed read.** `ProcessMemory` requires `bytes_read == size`; `safe_read` reads into a
+  temporary, so on failure the caller's variable is untouched.
+- **Implausible requests never reach RPM.** `core::Memory::read_bytes` rejects null buffers, empty sizes and ranges
+  outside user space before calling the implementation (tested with `FakeMemory::read_count()`).
+- **`CreateToolhelp32Snapshot(TH32CS_SNAPMODULE)` can fail with `ERROR_BAD_LENGTH`** while the game is still loading
+  modules. `core::module_base` retries.
 
 ### CS2 / Source 2 specifics
 - **Offsets change on every update.** Subscribe to `a2x/cs2-dumper`. The moment a patch lands, the old offsets are
@@ -563,8 +597,9 @@ Rules:
 - Respect §1. If a task drifts toward online use, evasion, stealth, networking or distribution, stop and tell the
   user.
 - Open the process handle with the minimum access rights needed.
-- Wrap every game read in `core::safe_read<T>` and every write in `core::safe_write<T>`. Never a raw `RPM` call
-  outside `core/memory`.
+- Read and write game memory only through `core::Memory` (`safe_read<T>` / `read<T>` / `safe_write<T>`). Code that
+  only reads takes `const core::Memory&`; code that writes takes `core::Memory&`. Never a raw `RPM`/`WPM` call
+  outside `core/process_memory`. Test `game/` code with `tests/helpers/fake_memory.h`.
 - Keep maths and feature logic pure (no Win32, no ImGui, no game pointers) and unit-test it.
 - Keep commits small and focused; commit only after the user approves.
 - Build Debug and Release with **zero warnings** before calling a task done.
@@ -590,7 +625,7 @@ Rules:
 ## 12. Testing
 
 - **Unit tests** (from Phase 1): `tests` console exe (x64, doctest v2.5.3) that compiles the **pure** sources from
-  `src/external` (plus `core/memory.cpp` and `core/pattern.cpp`, which are Win32 but harmless to test) and
+  `src/external` (plus `core/process_memory.cpp` and `core/pattern.cpp`, which are Win32 but harmless to test) and
   `tests/**/*.cpp`. Run: `bin\Debug\tests.exe` (and `bin\Release\tests.exe`). When adding a pure `.cpp` under
   test, add it to `tests.vcxproj` too.
 - **In-game tests:** every phase lists acceptance criteria in §13. The user runs them; record the result in §14 and
@@ -607,18 +642,21 @@ Each phase ends with: zero-warning Debug + Release builds, tests passing (once t
 check, docs updated (§2 step 7), then a commit after approval.
 
 ### Phase 0: Scaffold + process handle
-- [ ] Solution, `external` (console exe) and `tests` projects, shared `props/common.props` (C++20, x64, `/MT`,
+- [x] Solution, `external` (console exe) and `tests` projects, shared `props/common.props` (C++20, x64, `/MT`,
       `/W4 /WX`)
-- [ ] `.gitignore`, `.gitattributes`, README stub, `docs/DEVLOG.md`, `docs/offsets.md`, `docs/dumps/`,
+- [x] `.gitignore`, `.gitattributes`, README stub, `docs/DEVLOG.md`, `docs/offsets.md`, `docs/dumps/`,
       `external/README.md`, this file
-- [ ] `core/process`: find `cs2.exe` (Toolhelp32), open a handle, look up `client.dll` and `engine2.dll` module
+- [x] `core/process`: find `cs2.exe` (Toolhelp32), open a handle, look up `client.dll` and `engine2.dll` module
       bases
-- [ ] `core/memory`: `safe_read<T>` / `safe_write<T>` wrappers around `ReadProcessMemory` / `WriteProcessMemory`,
-      with `__try/__except` guards and an `is_plausible_pointer` helper
-- [ ] `core/log`: `logger::info/warn/error`
-- [ ] `main.cpp`: open the handle, print the module bases and the local pawn pointer, wait for Enter, exit
-- [ ] Builds with zero warnings (Debug + Release)
-- [ ] Verified in-game by the user (launch with `-insecure`, offline bots)
+- [x] `core/memory`: `safe_read<T>` / `safe_write<T>` wrappers around `ReadProcessMemory` / `WriteProcessMemory`,
+      with `__try/__except` guards and an `is_plausible_pointer` helper (as the `core::Memory` interface +
+      `core::ProcessMemory`, with `FakeMemory` for tests)
+- [x] `core/log`: `logger::info/warn/error`
+- [x] `main.cpp`: open the handle, print the module bases and the local pawn pointer, wait for Enter, exit
+- [x] Builds with zero warnings (Debug + Release); `tests.exe` 13/13 cases pass in both
+- [x] Verified in-game by the user (launch with `-insecure`, offline bots): 2026-10-06, build 14189, offline
+      deathmatch: PID, both module bases and local pawn `0x4DF564BF800` printed; game closed → "cs2.exe not found".
+      Not exercised: main menu (`none`) and the access-denied path (the game isn't elevated on this PC).
 
 **Acceptance:** the tool finds `cs2.exe`, prints the PID, the `client.dll` base, the `engine2.dll` base, and the
 local pawn pointer (plausible hex). It exits cleanly. Running it with the game closed says "cs2.exe not found."
@@ -801,12 +839,13 @@ why, build it and use it, from the README alone.
 
 ## 14. Current status
 
-- **Phase 0: not started.**
-- **Prerequisites done:** a2x/cs2-dumper has been run. `docs/dumps/offsets.json` and `docs/dumps/client_dll.json`
-  exist and look healthy (29 offsets across 5 modules, 3301 classes, 569 enums; two non-critical pattern misses
-  on `dwSensitivity` and `dwSoundSystem_engineViewData` are cosmetic).
+- **Phase 0: done, verified in-game (2026-10-06, CS2 build 14189), approved, committed and pushed** to
+  `github.com/BigH018/cs2-external` (private, `main`) as three commits: build setup, core code + tests, docs + dumps.
+- **Dumps:** `docs/dumps/` holds `info.json`, `offsets.json`, `client_dll.json`, `interfaces.json` and
+  `buttons.json`, copied byte-for-byte from the user's a2x/cs2-dumper run (build 14189, 2026-10-06T16:04:45Z). The
+  dumper's git commit isn't in `info.json` and isn't recorded; build number + timestamp are the provenance.
 
-**Next:** Phase 0 — scaffold the solution, projects, and the process handle.
+**Next:** Phase 1 (overlay window + ImGui shell), in a new session.
 
 ---
 
@@ -830,6 +869,36 @@ why, build it and use it, from the README alone.
   every schema field, with its source and its proof.
 - **2026-10-06:** The bone array pointer is **not** in the schema dump. It must be found by hand (Cheat Engine or
   pattern scan) and recorded in `docs/offsets.md` with the build number. Skip bones in Phase 4; add them later.
+- **2026-10-06 (Phase 0):** Repo created: `github.com/BigH018/cs2-external`, **private**, default branch `main`, the
+  user (BigH018) is the only collaborator. Commits use the user's git identity with no AI attribution lines.
+- **2026-10-06 (Phase 0):** The Phase 0 handle is **read-only** (`PROCESS_VM_READ |
+  PROCESS_QUERY_LIMITED_INFORMATION`, `core::kReadOnlyAccess`). Write access is added only in the phase whose
+  feature needs it (Phase 5 angle writes / Phase 6 player values).
+- **2026-10-06 (Phase 0):** Offset and schema constants keep the **dumper's exact names** (`dwLocalPlayerPawn`,
+  later `m_iHealth`) instead of `kPascalCase`, so they can be grepped across dumps. A deliberate exception to §9.
+- **2026-10-06 (Phase 0):** The local-pawn read lives in `game/player.cpp` (`read_local_pawn`) rather than in
+  `main.cpp`, to keep the "only `game/` dereferences game memory" rule from day one. `game/offsets.h` holds only
+  `dwLocalPlayerPawn` until Phase 2 copies in the rest.
+- **2026-10-06 (Phase 0):** doctest v2.5.3 vendored now (already in the §4 stack) so the `tests` project exists from
+  Phase 0, with `core/memory` tests against our own process.
+- **2026-10-06 (Phase 0):** `common.props` is imported after `Microsoft.Cpp.props`; `WindowsTargetPlatformVersion`
+  and `CharacterSet` live in each `.vcxproj` (see §4). Same layout as the AC project.
+- **2026-10-06 (Phase 0, user said re-architecting is fine):** reviewed the AC project (`BigH018/internal-assault-cube`)
+  and adopted its patterns:
+  - **`core::Memory` is an interface** (pure header) with `ProcessMemory` (RPM/WPM) as the real implementation and
+    `tests/helpers/fake_memory.h` for tests. This is the external version of AC's pure `safe_memory.h`: AC could
+    test `game/` code because game memory was local; externally every read is RPM, so `game/` code takes a
+    `core::Memory&` and the Phase 3 entity-list tests run against a fake chunked entity list. Read-only code takes
+    `const Memory&`, so "this code can't write" is checked by the compiler. Range checks happen once in the base
+    (NVI: public `read_bytes` → private virtual `do_read`). A virtual call per RPM is negligible next to the syscall.
+  - **`config.h` exists from Phase 0** and holds the pointer bounds (`kMinValidPointer`/`kMaxValidPointer`) and the
+    process/module names, like AC's `config.h`.
+  - **Logger = AC's:** `noexcept`, drops the line if formatting throws, `[+]` / `[!]` / `[x]` prefixes.
+  - **`app/` (frame, state, live_view)** is added to the plan as the orchestrator from Phase 1; `main.cpp` stays a
+    bootstrap.
+  - **Code style = AC's:** namespace contents not indented, closing `} // namespace x`.
+- **2026-10-06 (Phase 0):** CLAUDE.md's earlier "3301 classes / 569 enums" for `client_dll.json` was wrong. The real
+  build-14189 dump has 542 classes and 14 enums (the copy the user pasted was complete).
 
 ---
 
