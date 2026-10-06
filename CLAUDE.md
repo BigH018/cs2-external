@@ -299,7 +299,7 @@ cs2-external/
       game/                       (THE ONLY place that dereferences game memory)
         offsets.h                 ✅ PURE: all 29 dumped globals, 16 buttons, 4 interface RVAs, kDumpBuildNumber,
                                      8 signatures (Signature + signatures::kClient), hand-found layouts (layout::)
-        schema.h                  ✅ PURE: 29 field offsets in 13 classes (from dumps/client_dll.json) + kFields
+        schema.h                  ✅ PURE: 30 field offsets in 14 classes (from dumps/client_dll.json) + kFields
         interfaces.h/.cpp         ✅ PURE: CreateInterface from outside (export → InterfaceReg list walk, lea/ret
                                      create functions decoded, not called)
         schema_system.h/.cpp      ✅ PURE: find_type_scope (SchemaSystem_001), index_classes (self-pointing class
@@ -313,7 +313,9 @@ cs2-external/
                                      "cs_player_controller")
         handle.h/.cpp             ✅ read_entity_system, identity_address, entity_at, resolve_handle (serial check)
         view.h/.cpp               ✅ read_view_matrix (client.dll + dwViewMatrix, inline 4x4)
-        bones.h/.cpp              🔲 [4+] bone array read (needs a self-found offset, see §7)
+        bones.h/.cpp              ✅ read_bones: scene node + m_modelState + 0x80 → 23 bone positions in one read,
+                                     garbage rejected (non-finite, > 200 units from the feet)
+        visibility.h/.cpp         ✅ player_slot, is_spotted_by (bit per slot), read_spotted_by_mask
         weapon.h/.cpp             ✅ read_active_weapon_id (pawn → services → handle → 0x149A), weapon_info (id →
                                      name + WeaponClass), weapon_class_name
         globals.h/.cpp            ✅ read_globals (one read: realtime, framecount, maxClients, interval, curtime,
@@ -321,16 +323,18 @@ cs2-external/
       maths/                      (PURE)
         vec.h                     ✅ Vec2, Vec3 (ops, dot, length, distance, is_finite), units_to_metres
         angles.h/.cpp             🔲 [5] Angles, normalize, calc_aim_angles, angular_distance, smoothing
-        projection.h              ✅ ViewMatrix (row-major 4x4, at, is_sane); [4] world_to_screen
-        skeleton.h/.cpp           🔲 [4+] joint specs, bone index → screen positions
+        projection.h/.cpp         ✅ ViewMatrix (row-major 4x4, at, is_sane), world_to_screen (w < 0.01 rejected)
+        skeleton.h/.cpp           ✅ bone indices (proven live), kSkeletonLinks (17), project_skeleton
       features/                   (PURE: data in, decisions out)
-        esp.h/.cpp                🔲 [4] health_colour, screen_box, display_name, build_esp → primitives
+        esp.h/.cpp                ✅ player_box, health_colour, is_enemy, display_name, distance_text, build_esp →
+                                     primitives (boxes/corners, outline, head circle, skeleton, health bar/number,
+                                     name, weapon, distance, SCOPED, snaplines, visible/hidden colours)
         aimbot.h/.cpp             🔲 [5] aim_point, find_candidates, select_target, compute_aim
         triggerbot.h/.cpp         🔲 [5] Triggerbot state machine
         feature_summary.h/.cpp    ✅ ActiveFeatures + feature_summary() → "ESP · Aimbot" for the watermark
       render/
-        primitives.h              🔲 [4] Line, Rect, FilledRect, Circle, Text, Primitive variant (PURE data)
-        painter.h/.cpp            🔲 [4] paint(primitives, font) on ImGui background draw list
+        primitives.h              ✅ Line, Rect, FilledRect, Circle, Text (+ TextAnchor), Primitive variant (PURE)
+        painter.h/.cpp            ✅ paint(draw list, primitives, font, size): ImGui, text with a shadow
       input/
         keys.h/.cpp               🔲 [7] VK ↔ names, KeySet
         actions.h/.cpp            🔲 [7] ActionId registry
@@ -338,7 +342,8 @@ cs2-external/
         key_poll.h/.cpp           🔲 [7] GetAsyncKeyState polling
         bind_capture.h/.cpp       🔲 [7] bind capture
       settings/
-        settings.h                🔲 [4] Settings struct (ESP section first, aimbot/triggerbot in [5])
+        settings.h                ✅ Settings { overlay, esp } (TeamMode, BoxStyle, SnaplineOrigin, EspColours);
+                                     [5] aimbot/triggerbot
         profile_json.h/.cpp       🔲 [8]
         profile_store.h/.cpp      🔲 [8]
         presets.h/.cpp            🔲 [8]
@@ -353,9 +358,10 @@ cs2-external/
                                      image_rounded
         menu.h/.cpp               ✅ header (logo, title, pills) + grouped sidebar + current page
         hud.h/.cpp                ✅ watermark (logo + active features) + frame outline, background draw list
-        pages/                    ✅ pages.h + one file per page: home (logo, live status), aimbot, triggerbot, esp,
-                                     misc (placeholders), settings (overlay switches)
-      color.h                     🔲 [4] Color (RGBA floats)
+        pages/                    ✅ pages.h + one file per page: home (logo, live status, map/players/you), esp (every
+                                     ESP option, colour pickers), settings (overlay switches), aimbot, triggerbot,
+                                     misc (placeholders)
+      color.h                     ✅ Color (RGBA floats): rgb(0xRRGGBB), faded, lerp
       config.h                    ✅ PURE: branding, pointer bounds, page size, process/module names, --diag flag and
                                      scan limits, menu key, menu sizes, timings; [5+] Range<T> + every setting range
       app/                        (the orchestrator, from AC: the only place that wires everything together)
@@ -363,8 +369,8 @@ cs2-external/
                                      globals → console + OffsetReport for the Home page
         frame.h/.cpp              ✅ app::run: the loop (pump → game window/focus → menu key → status read → draw →
                                      present) and the overlay's teardown
-        state.h                   ✅ AppState (game info, offset report, overlay options, active features, menu open,
-                                     match status, overlay size/FPS)
+        state.h                   ✅ AppState (game info, offset report, settings, active features, menu open,
+                                     match status, game snapshot, overlay size/FPS)
         live_view.h/.cpp          ✅ `--live`: console table (~4 Hz) of globals, view matrix, every player, read time;
                                      redraws in place in a console, plain frames when redirected
   tests/
@@ -391,20 +397,23 @@ cs2-external/
     game/test_offsets.cpp         ✅ table sanity: signatures parse + wildcard their disp32, no duplicates, derived
                                      values (pawn = prediction + 0xF8, weapon chain = 0x149A)
     maths/test_angles.cpp         🔲 [5]
-    maths/test_projection.cpp     🔲 [4]
-    maths/test_skeleton.cpp       🔲 [4+]
-    features/test_esp.cpp         🔲 [4]
+    maths/test_projection.cpp     ✅ synthetic camera (centre, right, up, behind) + the live matrix (crosshair, a bot's
+                                     feet, transpose is wrong)
+    maths/test_skeleton.cpp       ✅ links valid, projection with ends behind the camera
+    game/test_bones.cpp           ✅ read_bones layout, garbage rejected
+    game/test_visibility.cpp      ✅ slot bits across both halves, read_spotted_by_mask
+    features/test_esp.cpp         ✅ box geometry, health colour, team modes, skips, visibility colours, labels, styles
     features/test_aimbot.cpp      🔲 [5]
     features/test_triggerbot.cpp  🔲 [5]
     features/test_feature_summary.cpp ✅ the watermark's feature line (empty, one, order, all)
-    settings/test_settings.cpp    🔲 [4]
+    settings/test_settings.cpp    ✅ defaults inside their ranges, config::Range
     settings/test_profile_json.cpp 🔲 [8]
     settings/test_profile_store.cpp 🔲 [8]
     settings/test_presets.cpp     🔲 [8]
     input/test_keys.cpp           🔲 [7]
     input/test_keybinds.cpp       🔲 [7]
     input/test_bind_capture.cpp   🔲 [7]
-    test_color.cpp                🔲 [4]
+    test_color.cpp                ✅ rgb, lerp, faded
 ```
 
 ---
@@ -550,7 +559,12 @@ Writing a button global is a game write: it needs `PROCESS_VM_WRITE | PROCESS_VM
 the aimbot's angle writes). The exact value format of a button write is verified in-game before it's used.
 
 ### What the dumper does NOT give you (must be found by hand)
-1. **The bone array pointer.** Not in the schema. Valve keeps it out. Find it by:
+1. **The bone array pointer.** Not in the schema. **Found in Phase 4** (build 14189, `offsets::layout::kModelStateBones`,
+   `game/bones`, proof in `docs/offsets.md` "Bones"): pawn → `m_pGameSceneNode` (a `CSkeletonInstance`) +
+   `m_modelState` (`0x140`, schema) + **`0x80`** → array of 32-byte bones (position, scale, rotation). Joint indices
+   (`maths/skeleton.h`) are **not** the commonly published ones: head 6, neck 5, spine 4/3/2, pelvis 1, arms 9-11 and
+   13-15, legs 17-19 and 20-22. `--diag` checks the head bone height on every alive player. How it was originally
+   meant to be found (kept for the next time it moves):
    - **Cheat Engine:** get a pawn, follow `pawn + m_pGameSceneNode`, walk forward into the model state, look for a
      pointer to a block of `matrix3x4a_t` values whose first entry tracks the pawn's world position as the pawn
      moves. Once found, record the byte offset in `docs/offsets.md` with the build number.
@@ -641,8 +655,12 @@ Rules:
 - `Vec3 { float x, y, z; }` — 12 bytes.
 - The angle convention is **not AC's**. Verify yaw 0 direction, pitch sign, and yaw range in-game with a
   diagnostic before writing any aim math.
-- The view matrix is **4x4 floats, row-major** in Source 2 (unlike OpenGL's column-major). Confirm in-game:
-  `clip.x = m[0]x + m[1]y + m[2]z + m[3]`.
+- The view matrix is **4x4 floats, row-major** in Source 2 (unlike OpenGL's column-major). **Confirmed in Phase 4:**
+  `clip.x = m[0]x + m[1]y + m[2]z + m[3]`, `w = m[12]x + ... + m[15]` = distance along the view direction; a point
+  along the view angles lands exactly on the screen centre (`maths/projection`, live-data unit test).
+- **Angles (proven in Phase 4, for Phase 5):** `m_angEyeAngles` = `dwViewAngles` = (pitch, yaw, roll) in degrees;
+  pitch **positive = looking down**; yaw from +x towards +y (counter-clockwise seen from above); forward =
+  (cos p · cos y, cos p · sin y, −sin p). World: x/y horizontal, z up, 1 unit = 1 inch.
 
 ---
 
@@ -677,7 +695,15 @@ Rules:
   and class), `CGlobalVars` (map, tick, curtime, maxClients) and the view matrix (sanity-checked). One read of 20
   players takes ~0.33 ms. `cs2_external.exe --live` shows it as a console table refreshed ~4 times a second (in place
   in a console; plain frames when redirected to a file). In the overlay, Home shows Map, Players ("20 in the match,
-  20 alive") and You (name, team, HP, weapon). Nothing is drawn over the game yet.
+  20 alive") and You (name, team, HP, weapon).
+- **Phase 4 (built 2026-10-06, auto-approved):** the **ESP** (menu → ESP → Enabled; off by default). Over every bot
+  that is alive, not dormant, in front of the camera and within the max distance: a box (full or corners, optional
+  dark outline), head circle, skeleton (from the bones), health bar and number, name, "SCOPED" when zoomed in,
+  weapon, distance in metres, snaplines (from the bottom, centre or top). Team mode: Teams (enemies only, or
+  teammates too in team colours) or Free for all. Colours: enemy/team × visible/hidden, from the spotted-by mask
+  (visible = your slot's bit is set), each with opacity; thickness slider. Everything applies live. While the ESP is
+  on, the game snapshot is read every frame (~0.4 ms). The watermark lists "ESP". `--diag` also checks CGlobalVars
+  and the bones on live players (48 checks in a match).
 
 ---
 
@@ -767,6 +793,13 @@ Rules:
 - **The dump's class count isn't the live "client" class count.** `client_dll.json` lists 542 classes because other
   libraries (entity2, pulse_runtime_lib, compositematerialslib) register theirs in the client scope; the live
   `index_classes(copy, "client")` finds 469. Classes we need come from client itself.
+- **The bone indices aren't the published ones.** Public CS2 code uses legs 22-27; in build 14189 bone 27 is a look-at
+  point 1000 units in front of the face, and the legs are 17-22. Indices were mapped from live positions in each
+  bot's own frame (`maths/skeleton.h`). If skeletons look scrambled after an update, re-map them the same way.
+- **Projection: reject w < 0.01, not w < 0.** A point near the camera plane divides by almost nothing. A transposed
+  (column-major) read of the matrix doesn't fail loudly: points collapse towards the centre (unit test guards it).
+- **Screenshots work for checking the overlay.** `PIL.ImageGrab.grab()` captures the game and the layered overlay
+  together (borderless 1920x1080), which is how Phase 4 was checked without the user.
 - **A pawn's designer name isn't `cs_player_pawn`.** In build 14189 a bot's pawn identity reads
   `c_cs_player_for_precache`. Find pawns through the controller's `m_hPlayerPawn`, never by designer name.
 - **Read bools as bytes.** `read<bool>` of a byte that isn't 0/1 is undefined behaviour in C++; `game/player` reads
@@ -957,24 +990,34 @@ every bot in a bot match; dying and respawning updates correctly; a bot match re
 matrix is sane before and during a frame.
 
 ### Phase 4: World-to-screen + ESP
-- [ ] `maths/projection`: `ViewMatrix`, `world_to_screen` (row-major, matching this build's matrix); tests
-- [ ] `maths/skeleton`: joint specs, bone index → screen positions (only if bones are found)
-- [ ] `settings/settings.h` (ESP section; the overlay options move in) + `app/frame` fills
+- [x] `maths/projection`: `ViewMatrix`, `world_to_screen` (row-major, matching this build's matrix); tests (incl.
+      the live matrix: the view direction lands on the crosshair)
+- [x] `maths/skeleton`: joint specs, bone index → screen positions (bones found: `game/bones`, model state + 0x80)
+- [x] `settings/settings.h` (ESP section; the overlay options move in) + `app/frame` fills
       `AppState::active` from it, so the watermark shows "ESP"
-- [ ] `features/esp`: pure decision; `render/primitives` + `render/painter` on the overlay's ImGui background
+- [x] `features/esp`: pure decision; `render/primitives` + `render/painter` on the overlay's ImGui background
       draw list
-- [ ] ESP page: 2D box, corner box, head circle, skeleton (optional), name, health bar/number, distance, weapon
-      name, snaplines (origin choice), team mode, enemies only, colours with opacity, thickness
-- [ ] Scoped indicator: a "SCOPED" tag on bots with `m_bIsScoped` set (option on the ESP page)
-- [ ] **Before building any visibility check, stop and remind the user of the three options and let them choose**
+- [x] ESP page: 2D box, corner box, head circle, skeleton (optional), name, health bar/number, distance, weapon
+      name, snaplines (origin choice), team mode, enemies only, colours with opacity, thickness (+ outline, max
+      distance)
+- [x] Scoped indicator: a "SCOPED" tag on bots with `m_bIsScoped` set (option on the ESP page)
+- [x] Visibility choice: taken from the §2a standing decision (user asleep): **option (2), the spotted-by mask**.
+      The original item, kept for reference:
+      **Before building any visibility check, stop and remind the user of the three options and let them choose**
       (they asked for this on 2026-10-06): (1) the game's own trace = internal, out of scope; (2) the spotted-by
       mask = external, no map geometry, cheap, but slightly delayed and "spotted" rather than per-pixel visible;
       (3) our own ray cast against the map's collision mesh parsed from the game files = external, exact and
       per-frame, but a big project (Valve file formats, a BVH, no moving doors/props). Default plan is (2).
-- [ ] Visible / hidden colours from the spotted-by heuristic (`game/visibility`: `is_spotted_by(pawn, local slot)`,
+- [x] Visible / hidden colours from the spotted-by heuristic (`game/visibility`: `is_spotted_by(mask, local slot)`,
       tested against FakeMemory)
-- [ ] Builds with zero warnings (Debug + Release); tests pass
-- [ ] Verified in-game by the user
+- [x] Builds with zero warnings (Debug + Release); tests 97/97 in both; `--diag` all 48 checks OK
+- [x] Verified in-game: **auto-approved** (user asleep). Checked here with screenshots of the overlay over the live
+      game (build 14189, de_mirage, 1920x1080, bots frozen): boxes, skeletons, head circles, health bars/numbers,
+      names, weapons, distances and snaplines on all 19 bots; skeletons inside their boxes, feet on the box bottom;
+      enemy/team hidden colours right; the watermark lists "ESP"; the ESP page renders. **Not exercised in-game:**
+      a bot in line of sight (no bot was visible from the player's spot, every spotted mask read 0, so the
+      "visible" colour and the slot bit are unverified), a scoped bot (bots had pistols), moving bots, dead bots,
+      other resolutions, a map change
 
 **Acceptance:** boxes line up with bots at near/far distance and different resolutions; nothing drawn for bots
 behind you; skeleton faces the right way (if bones are done); colours/opacity change live; dead bots not drawn;
@@ -1133,7 +1176,14 @@ why, build it and use it, from the README alone.
   layouts (entity list in code, `CGlobalVars`) in `offsets::layout`, proven live. **No dumped offset changed.**
   To check when awake: `cs2_external.exe --live` while dying/respawning and restarting the match.
 
-**Next:** Phase 4 (world-to-screen + ESP), visibility option (2) per the standing decisions (§2a).
+- **Phase 4: done, auto-approved (autonomous mode, 2026-10-06 night), committed and pushed.** Debug + Release zero
+  warnings, tests 97/97, `--diag` 48/48. ESP checked with screenshots over the live game. **Bones found** (model
+  state + 0x80, hand-found, proven live). **No dumped offset changed**; one schema field added
+  (`CSkeletonInstance::m_modelState`, from the dump). **To check when awake:** the visible colour with a bot in plain
+  view (unverified: no bot was in line of sight), "SCOPED" on a sniper bot, a map change.
+
+**Next:** Phase 5 (aimbot + triggerbot): write handle, angle writes, `attack` button format (live write tests allowed
+by §2a).
 
 ---
 
@@ -1260,6 +1310,17 @@ why, build it and use it, from the README alone.
 - **2026-10-06 (Phase 3):** `game/snapshot.h` replaces the planned `game/structs.h`; `ViewMatrix` lives in
   `maths/projection.h` now (world_to_screen joins it in Phase 4). Snapshots read field by field (≈30 reads per player,
   0.33 ms for 20 players) rather than in big blocks: simple, and fast enough to do every frame.
+- **2026-10-06 (Phase 4, auto-approved):** Visibility = **option (2), the spotted-by mask**, from the §2a standing
+  decision (the "stop and ask" item was answered in advance). Slot = controller index − 1.
+- **2026-10-06 (Phase 4):** **Bones done in Phase 4** after all (the plan said "skip bones"): CS2 was running, so
+  model state + 0x80 could be proven on 20 live pawns in minutes, and `--diag` now re-checks it every launch. The
+  skeleton, the head circle and (Phase 5) head aim use it; without bones the head falls back to the eye position.
+- **2026-10-06 (Phase 4):** `settings::Settings` replaces `app::OverlayOptions` (overlay + esp sections, `config::Range`
+  for numbers). The ESP is **off by default**. The box is computed from the feet and the eyes (+8 units), not from
+  the bones, so it works without bones; width = height / 2.
+- **2026-10-06 (Phase 4):** "Team mode" means **Teams vs Free for all** (CS2 deathmatch is free-for-all), plus "Show
+  teammates" in Teams mode. Primitives are plain data (`render/primitives.h`), so the whole ESP decision is
+  unit-tested; only `render/painter` touches ImGui.
 - **2026-10-06 (Phase 3):** Weapons are named from the **item definition index** (table in `game/weapon.cpp`), not the
   designer name, because some weapons share a designer name (USP-S / P2000). Each also gets a `WeaponClass` for the
   Phase 5 triggerbot filter.

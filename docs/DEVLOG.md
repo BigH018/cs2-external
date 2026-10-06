@@ -208,3 +208,40 @@ the running game: 20 players, names/teams/weapons/positions right, globals ticki
 `--diag`: all 45 checks OK. The normal start still brings up the overlay and logs "In a match".
 **Not exercised in-game:** death and respawn, a match restart, a map change, the main menu (covered by unit tests
 only). Bots were frozen, so moving positions weren't seen either.
+
+## 2026-10-06 (night, autonomous mode): Phase 4, world-to-screen + ESP
+
+Auto-approved: user was asleep and did not personally verify this phase. If in-game testing fails, this commit is the
+first suspect for rollback.
+
+**Proven live first (read-only script + screenshots, build 14189, de_mirage):**
+- Row-major projection: the point 1000 units along the view angles lands exactly on (960, 540); up = up the screen,
+  right = right, behind = negative w. Gives the Phase 5 angle convention too (pitch positive = down).
+- **Bones:** scene node + `m_modelState` (0x140) + 0x80 → 32-byte bones. The joint indices differ from the commonly
+  published ones (bone 27 is a look-at point 1000 units ahead; the legs are 17-22), so they were mapped from live
+  positions in each bot's own frame, on CT and T models.
+- Spotted-by masks all read 0: no bot was in line of sight (matches the screen and the radar). The bit numbering
+  stays unverified until a bot is in plain view.
+
+**Built**
+- `maths/projection` (`world_to_screen`), `maths/skeleton` (indices, links, `project_skeleton`), `color.h`,
+  `render/primitives.h`, `render/painter`, `settings/settings.h` (overlay + ESP; `config::Range`),
+  `game/bones`, `game/visibility`, `features/esp` (`build_esp` and helpers), the ESP page (every option, colour
+  pickers with opacity), `app/frame` (snapshot every frame while the ESP is on, ESP under the HUD, `active.esp`).
+- Snapshot: `spotted_by_mask`, `bones`, `head_position()`, `slot()`.
+- `--diag` section 6 "Match reads": CGlobalVars sanity and the bones on every alive player (48 checks in a match).
+- Tests: projection (synthetic camera + live matrix), skeleton, bones, visibility, colour, settings, ESP (box
+  geometry, team modes, skips, visibility colours, labels, styles). 97 cases / 1728 assertions.
+
+**Problems and fixes**
+- The "transposed matrix is wrong" test first compared the crosshair point, which a transposed matrix also puts near
+  the centre (everything collapses there). It now uses a bot's feet, which don't project at all transposed.
+- `Set-Content -Encoding utf8` (PowerShell 5.1) added a BOM to `main.cpp`; stripped.
+
+**Verified here:** Debug and Release build with zero warnings; tests 97/97 in both; `--diag` all 48 checks OK
+(bones: 20 of 20 players, head 52-60 units up). With every ESP option switched on in a scratch build (reverted, not
+committed), screenshots over the live game showed boxes, skeletons, head circles, health, names, weapons, distances
+and snaplines on all 19 bots, the skeletons inside their boxes; the ESP page rendered correctly. Read time with
+bones: ~0.37 ms per snapshot.
+**Not exercised in-game:** the visible colour (no bot in line of sight), SCOPED (bots had pistols), moving or dead
+bots, other resolutions, a map change.

@@ -101,7 +101,8 @@ The code uses the **dump values**; the signatures are the cross-check (and the w
 
 ## Schema fields (`src/external/game/schema.h`)
 
-29 fields in 13 classes, copied by script from `client_dll.json`. Proof: the diagnostic reads each one from the live
+29 fields in 13 classes, copied by script from `client_dll.json` (Phase 2); `CSkeletonInstance::m_modelState` (320 =
+`0x140`) added in Phase 4, copied from the same dump (30 fields, 14 classes). Proof: the diagnostic reads each one from the live
 schema system and compares. 2026-10-06, build 14189: **all 29 matched**. The scratch script also compared all 3013
 fields of the 469 live client classes with the dump: 0 mismatches.
 
@@ -114,6 +115,7 @@ fields of the 469 live client classes with the dump: 0 mismatches.
 | | `m_fFlags` | `0x3F4` | bunny hop (bit 0 `FL_ONGROUND`), triggerbot "in air" |
 | | `m_vecVelocity` | `0x430` | bunny hop diagnostics |
 | `CGameSceneNode` | `m_vecAbsOrigin` / `m_bDormant` | `0xC8` / `0x103` | position, dormant filter |
+| `CSkeletonInstance` | `m_modelState` | `0x140` | bones (Phase 4; the pawn's scene node is a CSkeletonInstance) |
 | `C_BaseModelEntity` | `m_vecViewOffset` | `0xF60` | eye position |
 | `C_BasePlayerPawn` | `m_pWeaponServices` / `m_hController` | `0x12F0` / `0x14BC` | weapon, owner |
 | `CPlayer_WeaponServices` | `m_hActiveWeapon` | `0x60` | weapon |
@@ -214,3 +216,52 @@ row 3 · (x, y, z, 1)). `ViewMatrix::is_sane` rejects all-zero and non-finite ma
 
 The item definition index (weapon + `0x149A`, uint16) → name and class, from a table of CS2 item definition indices.
 Ids read live: 7 (`weapon_ak47`), 4 (`weapon_glock`), 32 (`weapon_hkp2000`).
+
+## Bones (`offsets::layout::kModelStateBones`, `kBoneStride`; code: `game/bones`, indices in `maths/skeleton.h`)
+
+Not in any dump. Found 2026-10-06 (build 14189, de_mirage bot match) with a read-only script:
+
+- pawn + `m_pGameSceneNode` → scene node (a `CSkeletonInstance`) + `m_modelState` (`0x140`) + **`0x80`** → pointer to
+  the bone array. Non-null for all 20 pawns.
+- Each bone is **32 bytes**: `Vector position` (12), `float scale` (read 1.0 for every bone), `Quaternion rotation`
+  (16).
+- Positions sit on the pawn: bone 0 at the feet (≈ the origin), the highest bones ~64 units up, nothing more than
+  ~22 units sideways, except bone 27, which is ~1000 units straight ahead of the face (a look-at target).
+- Joint indices mapped from each bone's position in the bot's own frame (forward / left / up from its feet, using its
+  eye yaw), identical on CT (Kev, Specialist) and T (Blackwolf, Skullhead) models:
+
+| Index | Joint | Kev (standing): fwd / left / up |
+|---|---|---|
+| 0 | root (feet) | 0 / 0 / -1.5 |
+| 1 | pelvis | -3.7 / 5.4 / 37.1 |
+| 2, 3, 4 | spine | up 38.1, 42.1, 46.7 |
+| 5 | neck | -2.1 / 3.5 / 53.0 |
+| 6 | **head** | 0.6 / 1.8 / 58.7 |
+| 7 | face / eyes (27 looks from here) | 4.7 / 0.1 / 62.4 |
+| 9, 10, 11 | left shoulder, elbow, hand | left +9.7 → hand 17 forward (holding the gun) |
+| 13, 14, 15 | right shoulder, elbow, hand | left -5.3 → hand 16 forward |
+| 17, 18, 19 | left hip, knee, foot | up 33.6, 19.4, 2.9 |
+| 20, 21, 22 | right hip, knee, foot | up 33.3, 17.8, 3.7 |
+
+The often-published CS2 list (legs at 22-27) does not match this build. `read_bones` reads bones 0..22 (736 bytes, one
+read) and rejects the array if a bone is non-finite or > 200 units from the feet.
+
+Proof in the tool: `--diag` "Bones (model state + 0x80)": all alive players have bones, head bone 30-80 units above
+the feet (read: 20 of 20, 52 to 60). Screenshot 2026-10-06: every skeleton drawn inside its box, head circle on the
+head, feet on the box's bottom edge.
+
+## Projection (`maths/projection`)
+
+`dwViewMatrix` is row-major (see "View matrix" above). Proven 2026-10-06 with the local player's eye position
+(origin + `m_vecViewOffset`) and view angles (`dwViewAngles` = `m_angEyeAngles` = (6.105, -37.210, 0)): the point
+1000 units along forward = (cos p · cos y, cos p · sin y, -sin p) projected to (960.0, 540.0) on 1920x1080, at 100,
+1000 and 5000 units, with w equal to the distance. 100 units up → y 467.6 (up the screen); 100 units right (yaw - 90°)
+→ x 1032; 1000 units behind → w = -1000. So: pitch positive = looking down, screen y grows downwards, w < 0 behind.
+The matrix and points are in `tests/maths/test_projection.cpp`.
+
+## Spotted-by mask (`game/visibility`), **unverified in-game**
+
+`C_CSPlayerPawn::m_entitySpottedState` (`0x1E88`) + `EntitySpottedState_t::m_bSpottedByMask` (`0xC`): uint32[2], read
+as one uint64; bit n = player slot n = controller index n + 1. 2026-10-06: every pawn's mask and `m_bSpotted` read 0,
+consistent with what the screen showed (no bot in line of sight from the player's spot, no enemy dots on the radar),
+but the bit numbering (slot = index − 1) could not be checked with a visible bot. Check it with a bot in plain view.
