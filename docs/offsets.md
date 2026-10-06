@@ -151,7 +151,7 @@ script. The diagnostic exercises every one on each launch.
 | `SchemaClassFieldData` | name `+0x0`, offset int32 `+0x10`, stride `0x20` | 3013 fields = dump |
 | prediction → local pawn | `+0xF8` | dump difference; signature + 0xF8 = dump |
 
-## Entity list (for Phase 3, found while proving Phase 2)
+## Entity list (`offsets::layout::kEntity*`, `kIdentity*`, `kHandle*`; code: `game/handle`, `game/entities`)
 
 Proven 2026-10-06 by resolving the local player's `m_hActiveWeapon` handle (`0x1B182E6`, index 742) by hand:
 
@@ -163,4 +163,54 @@ Proven 2026-10-06 by resolving the local player's `m_hActiveWeapon` handle (`0x1
   compare `>> 15` on both sides).
 - `identity + 0x20` points to the designer name (`weapon_ak47`).
 
-Not in code yet; Phase 3 writes `game/handle` + `game/entities` against these, with FakeMemory tests.
+In code since Phase 3 (`offsets::layout`). Phase 3 proof (2026-10-06, build 14189, de_mirage bot match, read-only
+script, then `cs2_external.exe --live`):
+
+- Entity 0 is `worldent`; indices **1..20** held the 20 players' controllers, designer name `cs_player_controller`
+  (the next player index, 21, was empty). Player controllers are looked for at 1..maxClients (64).
+- Every controller's `m_hPlayerPawn` resolved (serial check passing) to a pawn with health 100, life state 0, the
+  controller's team, a finite origin and a view offset of ~64 units.
+- Every pawn's `m_hController` equals its controller's own handle (e.g. `0x8E0001` for index 1): the identity handle
+  layout holds in both directions.
+- A pawn's own designer name is `c_cs_player_for_precache` (entity 67), not `cs_player_pawn`: don't find pawns by
+  name.
+- Local player: `dwLocalPlayerController` = the index-1 controller (`bigh18valorant`), whose pawn = `dwLocalPlayerPawn`.
+
+## Players (`game/player`)
+
+Controller: `m_iTeamNum` (uint8: 2 = T, 3 = CT), `m_iszPlayerName` (char[128], inline), `m_hPlayerPawn` (handle),
+`m_bPawnIsAlive`. Pawn: `m_iHealth`, `m_lifeState` (0 = alive), `m_pGameSceneNode` → `m_vecAbsOrigin`,
+`m_bDormant`, `m_vecViewOffset`, `m_ArmorValue`, `m_fFlags`, `m_bIsScoped`; weapon via the chain below. All schema
+fields from Phase 2 (`schema.h`); read live 2026-10-06 and matching what the game shows (names, teams, AK-47 / Glock-18
+/ P2000 with ids 7 / 4 / 32).
+
+## CGlobalVars (`offsets::layout::kGlobals*`, code: `game/globals`)
+
+`client.dll + dwGlobalVars` holds a pointer to the struct. Found 2026-10-06 (build 14189) by reading `0x200` bytes
+twice, 2.0 s apart, in a bot match:
+
+| Offset | Field | Evidence |
+|---|---|---|
+| `0x00` | realtime (float) | advanced by 2.001 in 2.0 s |
+| `0x04` | framecount (int32) | advanced by 676 (≈ the game's FPS × 2) |
+| `0x08` / `0x34` | frametime (float) | ~0.005 (not used) |
+| `0x10` | maxClients (int32) | 64 |
+| `0x1C` | interval_per_tick (float) | 0.015625 = 1/64 |
+| `0x30` | curtime (float) | advanced by 2.001; = tickcount × interval (399512 × 1/64 = 6242.4) |
+| `0x44` | tickcount (int32) | advanced by 128 (64 tick × 2 s) |
+| `0x48` / `0x4C` | another tick + its time (not used) | +128 / +2.0 |
+| `0x188` | map name (`const char*`) | "de_mirage" (`0x180` points to "maps/de_mirage.vpk") |
+
+The layout CLAUDE.md used to call "typical" (curtime `0x10`, maxClients `0x18`) is wrong for this build: `0x10` reads
+64. `read_globals` reads `0x190` bytes in one go, then the map name.
+
+## View matrix (`client.dll + dwViewMatrix`, code: `game/view`)
+
+16 floats inline at the global (no pointer). Read 2026-10-06 in a bot match: non-zero, finite, with the bottom row
+`[0.792, -0.601, -0.106, 1821.5]`, i.e. the camera's forward axis and a translation, as row-major predicts (clip.w =
+row 3 · (x, y, z, 1)). `ViewMatrix::is_sane` rejects all-zero and non-finite matrices. Projection is Phase 4.
+
+## Weapons (`game/weapon`)
+
+The item definition index (weapon + `0x149A`, uint16) → name and class, from a table of CS2 item definition indices.
+Ids read live: 7 (`weapon_ak47`), 4 (`weapon_glock`), 32 (`weapon_hkp2000`).

@@ -167,3 +167,44 @@ with a read-only Python/ctypes script (scratch, not in the repo) **before** the 
 (Debug and Release) against the running game: **all 45 checks OK**; copying client.dll (41 MiB) takes ~8 ms.
 In-game check by the user: normal start in an offline bot match printed all 45 checks OK and the overlay started.
 Approved and committed.
+
+## 2026-10-06 (night, autonomous mode): Phase 3, entity list + snapshots
+
+Auto-approved: user was asleep and did not personally verify this phase. If in-game testing fails, this commit is the
+first suspect for rollback.
+
+CS2 was running (build 14189, de_mirage, a bot match with frozen bots), so the layouts were proven with a read-only
+Python script first, then the C++ was checked with the new `--live` view.
+
+**Built**
+- `game/handle`: entity system pointer, identity address (chunk + slot × 0x70), `entity_at`, `resolve_handle` (the
+  identity's handle must equal the handle, so a reused slot doesn't resolve).
+- `game/entities`: `designer_name`, `find_player_controllers` (indices 1..maxClients named `cs_player_controller`).
+- `game/player`: `read_player` (controller: name, team, pawn handle, alive; pawn: health, life state, position, eye
+  height, armour, flags, scoped, dormant, weapon) with validity checks; `read_game` (globals, view matrix if sane,
+  every player, which one is local).
+- `game/globals` (CGlobalVars in one read), `game/view` (view matrix), `game/weapon` (pawn → weapon id → name and
+  class), `game/snapshot.h`, `maths/vec.h`, `maths/projection.h` (`ViewMatrix` + `is_sane`).
+- `app/live_view` + `--live`: a console table at ~4 Hz, in place (VT escapes) or as plain frames when redirected.
+- Home page: Map, Players, You rows from a ~4 Hz snapshot.
+- Tests: `helpers/fake_entities.h` (a fake chunked entity system) and 29 new cases (handle, entities, player, globals,
+  view, weapon, vec). 70 cases / 1264 assertions.
+
+**Found along the way**
+- `CGlobalVars` doesn't have the "typical" layout CLAUDE.md gave: in build 14189, `+0x10` is maxClients (64), curtime
+  is at `+0x30`, tickcount at `+0x44`, the map name at `+0x188`. Proven by sampling twice 2 s apart. CLAUDE.md fixed.
+- A pawn's designer name is `c_cs_player_for_precache`, not `cs_player_pawn`.
+- A full snapshot of 20 players costs ~0.33 ms (≈600 RPM calls): fine to do every frame for the ESP.
+
+**Problems and fixes**
+- Scripted edits through a Bash heredoc lost a level of backslashes: `game\view.cpp` turned into a vertical tab
+  (MSBuild: "hexadecimal value 0x0B is an invalid character"), `app\frame` / `game\test_*` replacements silently
+  didn't match (LNK2019 for `run_live_view`, missing tests), and `'\n'` became a raw newline in C++. Fixed with the
+  Edit tool; backslash text is no longer edited through heredocs.
+- `--live` redirected to a file failed ("no virtual terminal support"); it now falls back to plain frames.
+
+**Verified here:** Debug and Release build with zero warnings; `tests.exe` 70/70 in both. `--live` (Release) against
+the running game: 20 players, names/teams/weapons/positions right, globals ticking at 64 Hz, view matrix sane.
+`--diag`: all 45 checks OK. The normal start still brings up the overlay and logs "In a match".
+**Not exercised in-game:** death and respawn, a match restart, a map change, the main menu (covered by unit tests
+only). Bots were frozen, so moving positions weren't seen either.

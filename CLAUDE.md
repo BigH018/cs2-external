@@ -283,7 +283,8 @@ cs2-external/
       external.rc                 ✅ the exe icon (assets/logo.ico)
       main.cpp                    ✅ bootstrap: DPI awareness, console Ctrl handler, find cs2.exe → read-only handle
                                      → print PID, module bases, local pawn → offset diagnostic → app::run
-                                     (`--diag`: exit after the diagnostic; exit code 0 = all OK, 2 = a check failed)
+                                     (`--diag`: exit after the diagnostic; exit code 0 = all OK, 2 = a check failed;
+                                     `--live`: the console live view instead of the diagnostic and overlay)
       core/
         process.h/.cpp            ✅ UniqueHandle, find_process, open_handle, module_base (Toolhelp32),
                                      find_main_window (EnumWindows), is_running
@@ -304,18 +305,23 @@ cs2-external/
         schema_system.h/.cpp      ✅ PURE: find_type_scope (SchemaSystem_001), index_classes (self-pointing class
                                      infos in a client.dll copy), read_class (live fields)
         signatures.h/.cpp         ✅ PURE: resolve_signature over a module copy (several hits must agree)
-        structs.h                 🔲 [3] Vec3, PlayerSnapshot, accessor helpers
-        player.h/.cpp             ✅ read_local_pawn (Phase 0); [3] make_snapshot, validity checks, collect_players
-        entities.h/.cpp           🔲 [3] walk the chunked entity list remotely
-        handle.h/.cpp             🔲 [3] CHandle → entity pointer resolution
-        view.h/.cpp               🔲 [3] view matrix read
+        snapshot.h                ✅ PURE data: Team, PlayerSnapshot (controller + pawn copy, eye_position, on_ground),
+                                     GameSnapshot (globals, view matrix if sane, players, local())
+        player.h/.cpp             ✅ read_local_pawn; read_player (controller → pawn, validity checks: garbage pawn
+                                     dropped); read_game (entity system, globals, view, every controller)
+        entities.h/.cpp           ✅ designer_name, find_player_controllers (indices 1..maxClients,
+                                     "cs_player_controller")
+        handle.h/.cpp             ✅ read_entity_system, identity_address, entity_at, resolve_handle (serial check)
+        view.h/.cpp               ✅ read_view_matrix (client.dll + dwViewMatrix, inline 4x4)
         bones.h/.cpp              🔲 [4+] bone array read (needs a self-found offset, see §7)
-        weapon.h/.cpp             🔲 [3] read weapon id / name
-        globals.h/.cpp            🔲 [3] CGlobalVars reads (curtime, maxClients, interval_per_tick)
+        weapon.h/.cpp             ✅ read_active_weapon_id (pawn → services → handle → 0x149A), weapon_info (id →
+                                     name + WeaponClass), weapon_class_name
+        globals.h/.cpp            ✅ read_globals (one read: realtime, framecount, maxClients, interval, curtime,
+                                     tickcount, map name), is_sane
       maths/                      (PURE)
-        vec.h                     🔲 [3] Vec2, Vec3 + ops
+        vec.h                     ✅ Vec2, Vec3 (ops, dot, length, distance, is_finite), units_to_metres
         angles.h/.cpp             🔲 [5] Angles, normalize, calc_aim_angles, angular_distance, smoothing
-        projection.h/.cpp         🔲 [4] ViewMatrix, world_to_screen (row-major, matching this build)
+        projection.h              ✅ ViewMatrix (row-major 4x4, at, is_sane); [4] world_to_screen
         skeleton.h/.cpp           🔲 [4+] joint specs, bone index → screen positions
       features/                   (PURE: data in, decisions out)
         esp.h/.cpp                🔲 [4] health_colour, screen_box, display_name, build_esp → primitives
@@ -359,7 +365,8 @@ cs2-external/
                                      present) and the overlay's teardown
         state.h                   ✅ AppState (game info, offset report, overlay options, active features, menu open,
                                      match status, overlay size/FPS)
-        live_view.h/.cpp          🔲 [3] debug console view (~4 Hz) with local player + every bot
+        live_view.h/.cpp          ✅ `--live`: console table (~4 Hz) of globals, view matrix, every player, read time;
+                                     redraws in place in a console, plain frames when redirected
   tests/
     tests.vcxproj                 ✅ console exe (doctest) → bin\<Config>\tests.exe
     main.cpp                      ✅ DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
@@ -368,7 +375,14 @@ cs2-external/
     helpers/fake_pe.h             ✅ map_fake_pe: a tiny PE32+ (headers, .text/.rdata, exports) in a FakeMemory
     core/test_memory.cpp          ✅ pointer checks + Memory's typed wrappers + read_string (via FakeMemory)
     core/test_process_memory.cpp  ✅ ProcessMemory RPM/WPM against our own process (uncommitted page, partial read)
-    game/test_player.cpp          ✅ read_local_pawn (Phase 0); [3] snapshots
+    helpers/fake_entities.h       ✅ FakeEntityList: a chunked entity system (identities, handles, designer names)
+    game/test_player.cpp          ✅ read_local_pawn, read_player (alive/dead/no pawn/garbage/stale), read_game
+    game/test_entities.cpp        ✅ designer_name, find_player_controllers (gaps, other entities, max_clients clamp)
+    game/test_handle.cpp          ✅ handle bits, entity_at across chunks, resolve_handle (serial, reuse, invalid)
+    game/test_globals.cpp         ✅ read_globals (live values), is_sane
+    game/test_view.cpp            ✅ read_view_matrix (live values), is_sane
+    game/test_weapon.cpp          ✅ weapon_info table, read_active_weapon_id chain
+    maths/test_vec.cpp            ✅ Vec2/Vec3 ops, is_finite, units_to_metres
     core/test_pattern.cpp         ✅ pattern parse, matches/find_all, copy_remote with a hole, rip_relative
     core/test_pe.cpp              ✅ headers, sections, exports (missing, prefix, forwarded, x86 rejected)
     game/test_interfaces.cpp      ✅ InterfaceReg walk, lea/ret decode, bad prologue, loop limit, broken link
@@ -379,8 +393,6 @@ cs2-external/
     maths/test_angles.cpp         🔲 [5]
     maths/test_projection.cpp     🔲 [4]
     maths/test_skeleton.cpp       🔲 [4+]
-    game/test_entities.cpp        🔲 [3] fake remote reader
-    game/test_handle.cpp          🔲 [3] CHandle resolution
     features/test_esp.cpp         🔲 [4]
     features/test_aimbot.cpp      🔲 [5]
     features/test_triggerbot.cpp  🔲 [5]
@@ -403,7 +415,8 @@ cs2-external/
 - **Pure modules** (no `<Windows.h>`, no ImGui, no raw game pointers): `maths/`, `features/`,
   `render/primitives.h`, `game/snapshot.h`, `input/keys|actions|keybinds`, `settings/`, `config.h`,
   `core/memory.h` (the interface, not the RPM implementation), `core/pattern`, `core/pe`, `game/offsets.h`,
-  `game/schema.h`, `game/interfaces`, `game/schema_system`, `game/signatures`. They take plain data (or a
+  `game/schema.h`, `game/interfaces`, `game/schema_system`, `game/signatures`, `game/handle`, `game/entities`,
+  `game/player`, `game/globals`, `game/view`, `game/weapon`. They take plain data (or a
   `core::Memory&`) and return plain data, so the `tests` project can compile and test them without the game.
 - **`core/`** owns the process handle, memory read/write, pattern scanning, and logging. **No DLL lifetime code**
   (there is no DLL).
@@ -544,13 +557,17 @@ the aimbot's angle writes). The exact value format of a button write is verified
    - **Pattern scan:** find the function in `client.dll` that computes bone matrices or reads the array, and read
      the offset from the instruction.
    For Phase 4, skip bones entirely. Add them later. A box ESP with name, health, team, distance is a working ESP.
-2. **`CGlobalVars` internal layout.** Standard Source 2 layout; verify against `dwGlobalVars` on this build.
-   Typical: `0x00 realtime`, `0x04 framecount`, `0x10 curtime`, `0x18 maxClients`, `0x1C interval_per_tick`.
+2. **`CGlobalVars` internal layout.** Proven live in Phase 3 (build 14189, `offsets::layout::kGlobals*`): `0x00`
+   realtime, `0x04` framecount, `0x10` maxClients (int, 64), `0x1C` interval_per_tick (1/64), `0x30` curtime, `0x44`
+   tickcount, `0x188` map name (`const char*`). The "typical" layout this file used to give (curtime `0x10`,
+   maxClients `0x18`) is wrong for this build.
 3. **Entity list iteration logic.** Chunks are 512 entries each; `entity_list + 0x10 + (index >> 9) * 0x8` is the
    chunk pointer; `chunk + (index & 0x1FF) * 0x70` is the entity identity; `identity + 0x0` is the entity pointer;
    `identity + 0x10` holds the entity's **whole handle** (index + serial); `identity + 0x20` points to the designer
    name (`weapon_ak47`). Proven live 2026-10-06 (build 14189, `docs/offsets.md` "Entity list"): the identity is
    **0x70** bytes (this file used to say 0x78, which reads 0) and `+0x10` is the handle, not the bare serial.
+   Player controllers sit at indices `1..maxClients` with the designer name `cs_player_controller` (Phase 3:
+   `game/entities`, `find_player_controllers`); a pawn's `m_hController` equals its controller's own handle.
 
 ### Interfaces from outside the process (`game/interfaces`, done in Phase 2)
 - Every module that registers interfaces exports its own `CreateInterface`. `core/pe` finds the export by parsing the
@@ -572,7 +589,7 @@ the aimbot's angle writes). The exact value format of a button write is verified
 - The schema values the code uses stay **compile-time constants** in `schema.h` (copied from the dump); the live
   schema is the startup proof, not a runtime override (see the Decision log, Phase 2).
 
-### Handle resolution (`game/handle.h`, Phase 3)
+### Handle resolution (`game/handle.h`, done in Phase 3)
 Every `m_h*` field (weapons, pawns, observers, defusers) is a `CHandle` (uint32): low 15 bits are the index, high
 bits are the serial. Resolution:
 ```cpp
@@ -653,7 +670,14 @@ Rules:
   `.text` (vs the dump); the client type scope and all 29 `schema.h` fields read from the live schema system; then,
   informational, the `jump`/`attack` button globals and the main `dw*` pointers as they read right now. Last line:
   `all 45 checks OK` (or how many failed). Home shows an "Offsets" row with the same result. `cs2_external.exe --diag`
-  runs only the diagnostic and exits (0 = all OK, 2 = a check failed). Nothing reads entities yet.
+  runs only the diagnostic and exits (0 = all OK, 2 = a check failed).
+- **Phase 3 (built 2026-10-06, auto-approved):** the tool reads the whole match: the entity list (chunked, handles
+  checked by serial), every player controller (indices 1..maxClients, designer name `cs_player_controller`), each
+  controller's pawn (health, armour, life state, position, eye height, flags, scoped, dormant, active weapon id → name
+  and class), `CGlobalVars` (map, tick, curtime, maxClients) and the view matrix (sanity-checked). One read of 20
+  players takes ~0.33 ms. `cs2_external.exe --live` shows it as a console table refreshed ~4 times a second (in place
+  in a console; plain frames when redirected to a file). In the overlay, Home shows Map, Players ("20 in the match,
+  20 alive") and You (name, team, HP, weapon). Nothing is drawn over the game yet.
 
 ---
 
@@ -743,6 +767,12 @@ Rules:
 - **The dump's class count isn't the live "client" class count.** `client_dll.json` lists 542 classes because other
   libraries (entity2, pulse_runtime_lib, compositematerialslib) register theirs in the client scope; the live
   `index_classes(copy, "client")` finds 469. Classes we need come from client itself.
+- **A pawn's designer name isn't `cs_player_pawn`.** In build 14189 a bot's pawn identity reads
+  `c_cs_player_for_precache`. Find pawns through the controller's `m_hPlayerPawn`, never by designer name.
+- **Read bools as bytes.** `read<bool>` of a byte that isn't 0/1 is undefined behaviour in C++; `game/player` reads
+  `std::uint8_t` and compares with 0.
+- **A garbage pawn is dropped, not half-trusted.** `read_player` fills the pawn part only after health (0..10000), the
+  scene node and a finite position all read sanely; otherwise the snapshot keeps the controller part with pawn 0.
 - **`dwNetworkGameClient_isBackgroundMap` (`0x2C143F`) looks wrong in the dump** (the other `dwNetworkGameClient_*`
   values are < 0x400). Don't use it without proof.
 
@@ -827,6 +857,8 @@ Rules:
 - **Offset re-verification test** (after every CS2 update): `bin\Release\cs2_external.exe --diag` with CS2 in a bot
   match. It checks the build number, interfaces, signatures and every schema field and ends with `all N checks OK` or
   `N of M checks FAILED` (exit code 0 / 2). Any FAIL is a flag. Cross-check against a fresh `a2x/cs2-dumper` run.
+- **Live game reads:** `bin\Release\cs2_external.exe --live` in a bot match: every player's name, team, health,
+  weapon and position, ~4 Hz. `--live > file.txt` writes plain frames (handy for checking from a script).
 
 ---
 
@@ -902,17 +934,23 @@ address. Every value matches what a fresh `a2x/cs2-dumper` run of the current CS
 explains the mismatch.
 
 ### Phase 3: Entity list + local player + snapshots
-- [ ] `game/entities`: walk the chunked entity list remotely; yield entities; filter to `C_CSPlayerController`
-- [ ] `game/handle`: `CHandle` → entity pointer resolution, with serial validation
-- [ ] `game/player`: build `PlayerSnapshot` from a controller (resolve pawn via `m_hPlayerPawn`); read health,
-      team, position, life state, name, weapon id; validity checks
-- [ ] `game/view`: read the view matrix; sanity check
-- [ ] `game/globals`: read `CGlobalVars` (curtime, maxClients, interval_per_tick)
-- [ ] `game/weapon`: read the active weapon id; map to a name
-- [ ] `app/live_view`: debug console view (~4 Hz) with local player + every bot
-- [ ] `maths/vec`, `game/snapshot.h` (pure), tested
-- [ ] Builds with zero warnings (Debug + Release); tests pass
-- [ ] Verified in-game by the user
+- [x] `game/entities`: walk the chunked entity list remotely; yield entities; filter to `C_CSPlayerController`
+      (indices 1..maxClients, designer name `cs_player_controller`)
+- [x] `game/handle`: `CHandle` → entity pointer resolution, with serial validation
+- [x] `game/player`: build `PlayerSnapshot` from a controller (resolve pawn via `m_hPlayerPawn`); read health,
+      team, position, life state, name, weapon id; validity checks (+ armour, eye height, flags, scoped, dormant)
+- [x] `game/view`: read the view matrix; sanity check
+- [x] `game/globals`: read `CGlobalVars` (curtime, maxClients, interval_per_tick; + tickcount, map name). Layout
+      found live (the "typical" one was wrong)
+- [x] `game/weapon`: read the active weapon id; map to a name (+ weapon class, for the Phase 5 filter)
+- [x] `app/live_view`: debug console view (~4 Hz) with local player + every bot (`--live`), and Home page rows
+- [x] `maths/vec`, `game/snapshot.h` (pure), tested
+- [x] Builds with zero warnings (Debug + Release); tests 70/70 in both
+- [x] Verified in-game: **auto-approved** (user asleep). Checked here against the running game (build 14189, de_mirage
+      bot match, bots frozen): `--live` showed all 20 players with the right names, teams, weapons (AK-47 / Glock-18
+      / P2000 ids 7 / 4 / 32), positions and distances; globals tick at 64 Hz; view matrix sane; `--diag` all 45 OK;
+      the overlay starts and detects the match. **Not exercised in-game:** death/respawn, a match restart, a map
+      change, the main menu (unit-tested only)
 
 **Acceptance:** live view shows the correct name, team, health, life state, weapon, and position for you and
 every bot in a bot match; dying and respawning updates correctly; a bot match restart doesn't crash; the view
@@ -1090,8 +1128,12 @@ why, build it and use it, from the README alone.
   identity is `0x70` bytes, `identity + 0x10` is the full handle (all three were wrong before, proven live).
   **No offset in code changed**: everything new was copied from the dumps, and the dump values all matched.
 
-**Next:** Phase 3 (entity list + snapshots) in a new session, using the corrected entity list layout (§7, and
-`docs/offsets.md` "Entity list").
+- **Phase 3: done, auto-approved (autonomous mode, 2026-10-06 night), committed and pushed.** Debug + Release zero
+  warnings, tests 70/70. Checked against the running game with `--live` (all 20 players correct). New hand-found
+  layouts (entity list in code, `CGlobalVars`) in `offsets::layout`, proven live. **No dumped offset changed.**
+  To check when awake: `cs2_external.exe --live` while dying/respawning and restarting the match.
+
+**Next:** Phase 4 (world-to-screen + ESP), visibility option (2) per the standing decisions (§2a).
 
 ---
 
@@ -1211,6 +1253,16 @@ why, build it and use it, from the README alone.
   auto-approved, each phase is committed (marked "Auto-approved: ...") and pushed, and the next phase starts; stop
   with a `HANDOFF.md` at ~90% context or at a real blocker. Switched ON the same night with standing decisions: live
   write tests allowed (offline match only), nlohmann/json approved, visibility = spotted-by mask, push every commit.
+- **2026-10-06 (Phase 3, auto-approved):** Player controllers are found by **index 1..maxClients + designer name**
+  (`cs_player_controller`), not by walking all ~300+ entities or reading class info: 20 RPM-cheap checks, proven live.
+- **2026-10-06 (Phase 3):** The live view is a **separate `--live` mode** (like `--diag`) instead of printing to the
+  normal console: 20 rows at 4 Hz would bury the log. The overlay's Home page shows a summary instead.
+- **2026-10-06 (Phase 3):** `game/snapshot.h` replaces the planned `game/structs.h`; `ViewMatrix` lives in
+  `maths/projection.h` now (world_to_screen joins it in Phase 4). Snapshots read field by field (≈30 reads per player,
+  0.33 ms for 20 players) rather than in big blocks: simple, and fast enough to do every frame.
+- **2026-10-06 (Phase 3):** Weapons are named from the **item definition index** (table in `game/weapon.cpp`), not the
+  designer name, because some weapons share a designer name (USP-S / P2000). Each also gets a `WeaponClass` for the
+  Phase 5 triggerbot filter.
 
 ---
 
