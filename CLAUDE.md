@@ -39,7 +39,7 @@ What that means in practice:
 ## 2. Session start protocol and how to work in this repo
 
 1. Read this whole file.
-2. Check **§14 Current status** to see where we are and what comes next.
+2. Check **§14 Current status** to see where we are and what comes next, and **§2a** whether autonomous mode is on.
 3. Confirm your understanding to the user in 2–3 lines (where we are, what the task is).
 4. Plan before coding: list the files you'll touch and why. Ask if anything is unclear. Don't guess.
 5. **One phase per session.** Don't start the next phase on your own.
@@ -61,6 +61,44 @@ What that means in practice:
 
 If you can't build here (e.g. no Visual Studio on the machine running the session), say so plainly. Never claim a
 build or test passed when it wasn't run.
+
+### 2a. Autonomous mode (the user switches it on and off)
+
+**Current setting: ON** (switched on 2026-10-06, night, after Phase 2; the user is asleep).
+
+The user switches it with **"autonomous mode on"** / **"autonomous mode off"**. Whoever is told that updates the
+"Current setting" line above (and, when switching on, the standing decisions below if the user gives new ones).
+When OFF, the normal protocol above applies (stop after each phase and wait for the user's OK). When ON:
+
+1. **"Verified in-game by the user" counts as auto-approved.** Don't wait. Do whatever in-game checking can be done
+   from here (the read-only diagnostic and live reads against the running game; live writes only if a standing
+   decision below allows them), then tick the box with "auto-approved" in the note.
+2. **Commit, push, continue.** Normal end-of-phase workflow (Debug + Release zero warnings, tests, docs per §16), then
+   commit, push, and start the next phase straight away. Still one phase per commit series.
+3. **Annotate every auto-approved commit** (message and its `docs/DEVLOG.md` entry) with this line:
+   `Auto-approved: user was asleep and did not personally verify this phase. If in-game testing fails, this commit is
+   the first suspect for rollback.`
+   No AI attribution lines, as always.
+4. **Stop at ~90% of the usable context** (or when getting close): stop mid-phase rather than rush, and write
+   `HANDOFF.md` at the repo root (below). Never start a new phase with less than ~10% left: a half-written phase is
+   worse than a clean stopping point.
+5. **Stop at a real blocker** and write `HANDOFF.md` plus a `docs/DEVLOG.md` note immediately: the build fails, a
+   test fails and a couple of attempts don't fix it, an offset doesn't match the dumps, the game updated, or anything
+   touches §1. Don't guess past a blocker.
+6. **Decisions that would normally wait for the user** (the Phase 4 visibility choice, new dependencies, big
+   architectural changes) are taken from the standing decisions below; anything not covered there is a blocker.
+
+**`HANDOFF.md` contents:** the phase and exactly where it stopped (done / half-done / not started); build state (Debug?
+Release? tests?) and the last known green commit hash; every file touched in the unfinished phase and what's left on
+each; every offset, signature or schema field changed but not verified in-game; the next concrete step; anything
+surprising, any shaky assumption, anywhere a fresh session should be suspicious.
+
+**Standing decisions for the current ON period (given 2026-10-06):**
+- Live **write** tests against the running CS2 (offline bot match, `-insecure`) are allowed: button value formats,
+  aimbot angle writes, triggerbot and bunny hop. Never against anything but that offline match (§1 unchanged).
+- Vendoring **nlohmann/json v3.12.0** (Phase 8) is approved.
+- Phase 4 visibility: option **(2), the spotted-by mask**.
+- **Push** every commit to `origin main`.
 
 ---
 
@@ -1169,6 +1207,10 @@ why, build it and use it, from the README alone.
 - **2026-10-06 (Phase 2):** CLAUDE.md corrected after live proof: weapon id chain `0x149A` (was `0x14FA`), entity
   identity `0x70` (was `0x78`), `identity + 0x10` = full handle (was "serial"), no `GameEntitySystem` interface,
   `SchemaSystem_001` lives in `schemasystem.dll`.
+- **2026-10-06 (user request):** **Autonomous mode** (§2a), switched on/off by the user. ON: in-game checks are
+  auto-approved, each phase is committed (marked "Auto-approved: ...") and pushed, and the next phase starts; stop
+  with a `HANDOFF.md` at ~90% context or at a real blocker. Switched ON the same night with standing decisions: live
+  write tests allowed (offline match only), nlohmann/json approved, visibility = spotted-by mask, push every commit.
 
 ---
 
