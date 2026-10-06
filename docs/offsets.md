@@ -35,3 +35,23 @@ None yet (Phase 2).
 ## Hand-found offsets
 
 None yet. The bone array pointer is planned for after Phase 4 (see `CLAUDE.md` §7).
+
+## Planned fields and buttons (not in code yet)
+
+Looked up on 2026-10-06 for the feature plan (bunny hop, ESP scoped indicator, visibility heuristic, configurable
+triggerbot), from the build-14189 dumps in `docs/dumps/`. Not used by any code yet: Phase 2 copies them into
+`schema.h` / `offsets.h` and proves them with its diagnostic. Button value formats get an in-game check before use.
+
+| Name | Where | Value (hex) | Source | For |
+|---|---|---|---|---|
+| `m_iHealth` | `C_BaseEntity` | `0x34C` | `client_dll.json` | ESP, aimbot, triggerbot |
+| `m_fFlags` | `C_BaseEntity` | `0x3F4` | `client_dll.json` | bunny hop (bit 0 `FL_ONGROUND`), triggerbot "in air" |
+| `m_vecVelocity` | `C_BaseEntity` | `0x430` | `client_dll.json` | bunny hop diagnostics |
+| `m_bIsScoped` | `C_CSPlayerPawn` | `0x1EA0` | `client_dll.json` | ESP scoped indicator, triggerbot "only when scoped" |
+| `m_entitySpottedState` | `C_CSPlayerPawn` | `0x1E88` | `client_dll.json` | visibility heuristic |
+| `m_bSpottedByMask` | `EntitySpottedState_t` | `+0xC` | `client_dll.json` | visibility heuristic (bit per player slot) |
+| `m_iIDEntIndex` | `C_CSPlayerPawn` | `0x36CC` | `client_dll.json` | triggerbot (entity under the crosshair) |
+| `m_iShotsFired` | `C_CSPlayerPawn` | `0x1EB4` | `client_dll.json` | triggerbot burst counting |
+| `m_flFlashDuration` | `C_CSPlayerPawnBase` | `0x1510` | `client_dll.json` | triggerbot "not while flashed" |
+| `jump` | client.dll | `0x22324E0` (35857632) | `buttons.json` | bunny hop |
+| `attack` | client.dll | `0x2231FD0` (35856336) | `buttons.json` | triggerbot |

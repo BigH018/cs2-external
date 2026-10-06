@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.jpg" width="180" alt="External Cheat logo">
+</p>
+
 # CS2 External (offline learning project)
 
 A personal learning project in reverse engineering and low-level Windows programming: a user-mode tool that reads
@@ -18,3 +22,6 @@ $msb = "C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bi
 bin\Release\tests.exe
 bin\Release\cs2_external.exe   # with CS2 running under -insecure
 ```
+
+The tool draws its own transparent overlay window on top of the game (no injection, no hooks). INSERT opens the menu;
+Ctrl+C in the console exits.
