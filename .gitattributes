@@ -17,6 +17,8 @@
 
 # Binary
 *.png       binary
+*.jpg       binary
+*.jpeg      binary
 *.ico       binary
 *.exe       binary
 *.dll       binary
