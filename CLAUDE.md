@@ -181,6 +181,9 @@ bin\Debug\tests.exe
 #   -insecure -console -novid -nojoy
 # Join a "Practice with Bots" match, then:
 bin\Release\cs2_external.exe
+
+# offset diagnostic only (no overlay), e.g. after a CS2 update; exit code 0 = all checks OK, 2 = a check failed:
+bin\Release\cs2_external.exe --diag
 ```
 - Run the external tool as **administrator** if `OpenProcess` fails (the game runs as admin on some setups).
 - The overlay is a separate window. It sits topmost over the game and is click-through until you press INSERT.
@@ -241,20 +244,28 @@ cs2-external/
       external.vcxproj            ✅ console exe → bin\<Config>\cs2_external.exe, x64, static CRT
       external.rc                 ✅ the exe icon (assets/logo.ico)
       main.cpp                    ✅ bootstrap: DPI awareness, console Ctrl handler, find cs2.exe → read-only handle
-                                     → print PID, module bases, local pawn → app::run
+                                     → print PID, module bases, local pawn → offset diagnostic → app::run
+                                     (`--diag`: exit after the diagnostic; exit code 0 = all OK, 2 = a check failed)
       core/
         process.h/.cpp            ✅ UniqueHandle, find_process, open_handle, module_base (Toolhelp32),
                                      find_main_window (EnumWindows), is_running
         memory.h                  ✅ PURE: is_plausible_pointer/range + core::Memory interface (read_bytes,
-                                     safe_read<T>, read<T>, write_bytes, safe_write<T>)
+                                     safe_read<T>, read<T>, write_bytes, safe_write<T>) + read_string (page-bounded)
         process_memory.h/.cpp     ✅ ProcessMemory : Memory, the only RPM/WPM calls (__try/__except-guarded)
-        pattern.h/.cpp            🔲 [2] signature scanner over a remote module
+        pattern.h/.cpp            ✅ PURE: Pattern (IDA style: parse, matches_at, find_all), RemoteCopy + copy_remote
+                                     (chunked, unreadable pages zero-filled), rip_relative / rip_relative_target
+        pe.h/.cpp                 ✅ PURE: a loaded module's PE headers, sections and exports via core::Memory
         log.h                     ✅ logger::info/warn/error (std::format, stdout)
         runtime.h                 ✅ shutdown_requested / shutdown_complete (set by the console Ctrl handler)
       game/                       (THE ONLY place that dereferences game memory)
-        offsets.h                 ✅ module RVAs (from dumps/offsets.json); only dwLocalPlayerPawn so far
-        schema.h                  🔲 [2] class field offsets (from dumps/client_dll.json)
-        interfaces.h/.cpp         🔲 [2] CreateInterface resolution from outside the process
+        offsets.h                 ✅ PURE: all 29 dumped globals, 16 buttons, 4 interface RVAs, kDumpBuildNumber,
+                                     8 signatures (Signature + signatures::kClient), hand-found layouts (layout::)
+        schema.h                  ✅ PURE: 29 field offsets in 13 classes (from dumps/client_dll.json) + kFields
+        interfaces.h/.cpp         ✅ PURE: CreateInterface from outside (export → InterfaceReg list walk, lea/ret
+                                     create functions decoded, not called)
+        schema_system.h/.cpp      ✅ PURE: find_type_scope (SchemaSystem_001), index_classes (self-pointing class
+                                     infos in a client.dll copy), read_class (live fields)
+        signatures.h/.cpp         ✅ PURE: resolve_signature over a module copy (several hits must agree)
         structs.h                 🔲 [3] Vec3, PlayerSnapshot, accessor helpers
         player.h/.cpp             ✅ read_local_pawn (Phase 0); [3] make_snapshot, validity checks, collect_players
         entities.h/.cpp           🔲 [3] walk the chunked entity list remotely
@@ -301,22 +312,32 @@ cs2-external/
         pages/                    ✅ pages.h + one file per page: home (logo, live status), aimbot, triggerbot, esp,
                                      misc (placeholders), settings (overlay switches)
       color.h                     🔲 [4] Color (RGBA floats)
-      config.h                    ✅ PURE: branding, pointer bounds, process/module names, menu key, menu sizes,
-                                     timings; [5+] Range<T> + every setting range
+      config.h                    ✅ PURE: branding, pointer bounds, page size, process/module names, --diag flag and
+                                     scan limits, menu key, menu sizes, timings; [5+] Range<T> + every setting range
       app/                        (the orchestrator, from AC: the only place that wires everything together)
+        diagnostics.h/.cpp        ✅ the startup offset diagnostic: build, interfaces, signatures, schema, buttons/
+                                     globals → console + OffsetReport for the Home page
         frame.h/.cpp              ✅ app::run: the loop (pump → game window/focus → menu key → status read → draw →
                                      present) and the overlay's teardown
-        state.h                   ✅ AppState (game info, overlay options, active features, menu open, match status,
-                                     overlay size/FPS)
+        state.h                   ✅ AppState (game info, offset report, overlay options, active features, menu open,
+                                     match status, overlay size/FPS)
         live_view.h/.cpp          🔲 [3] debug console view (~4 Hz) with local player + every bot
   tests/
     tests.vcxproj                 ✅ console exe (doctest) → bin\<Config>\tests.exe
     main.cpp                      ✅ DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-    helpers/fake_memory.h         ✅ FakeMemory : core::Memory (mapped regions at fake addresses, read/write counts)
-    core/test_memory.cpp          ✅ pointer checks + Memory's typed wrappers (via FakeMemory)
+    helpers/fake_memory.h         ✅ FakeMemory : core::Memory (mapped regions at fake addresses, read/write counts,
+                                     put_bytes/put_string)
+    helpers/fake_pe.h             ✅ map_fake_pe: a tiny PE32+ (headers, .text/.rdata, exports) in a FakeMemory
+    core/test_memory.cpp          ✅ pointer checks + Memory's typed wrappers + read_string (via FakeMemory)
     core/test_process_memory.cpp  ✅ ProcessMemory RPM/WPM against our own process (uncommitted page, partial read)
     game/test_player.cpp          ✅ read_local_pawn (Phase 0); [3] snapshots
-    core/test_pattern.cpp         🔲 [2] pattern parse, wildcard match, scan
+    core/test_pattern.cpp         ✅ pattern parse, matches/find_all, copy_remote with a hole, rip_relative
+    core/test_pe.cpp              ✅ headers, sections, exports (missing, prefix, forwarded, x86 rejected)
+    game/test_interfaces.cpp      ✅ InterfaceReg walk, lea/ret decode, bad prologue, loop limit, broken link
+    game/test_schema_system.cpp   ✅ type scope lookup, class index (module filter, duplicates), read_class
+    game/test_signatures.cpp      ✅ one hit, agreeing/disagreeing hits, add, section bounds, bad pattern
+    game/test_offsets.cpp         ✅ table sanity: signatures parse + wildcard their disp32, no duplicates, derived
+                                     values (pawn = prediction + 0xF8, weapon chain = 0x149A)
     maths/test_angles.cpp         🔲 [5]
     maths/test_projection.cpp     🔲 [4]
     maths/test_skeleton.cpp       🔲 [4+]
@@ -343,9 +364,9 @@ cs2-external/
 ### 6.1 Module responsibilities and dependency rules
 - **Pure modules** (no `<Windows.h>`, no ImGui, no raw game pointers): `maths/`, `features/`,
   `render/primitives.h`, `game/snapshot.h`, `input/keys|actions|keybinds`, `settings/`, `config.h`,
-  `core/memory.h` (the interface, not the RPM implementation), `game/offsets.h`,
-  `game/schema.h`. They take plain data and return plain data, so the `tests` project can compile and test them
-  without the game.
+  `core/memory.h` (the interface, not the RPM implementation), `core/pattern`, `core/pe`, `game/offsets.h`,
+  `game/schema.h`, `game/interfaces`, `game/schema_system`, `game/signatures`. They take plain data (or a
+  `core::Memory&`) and return plain data, so the `tests` project can compile and test them without the game.
 - **`core/`** owns the process handle, memory read/write, pattern scanning, and logging. **No DLL lifetime code**
   (there is no DLL).
 - **`game/`** is the only code that reads or writes game memory. It turns remote pointers into `PlayerSnapshot`
@@ -488,26 +509,40 @@ the aimbot's angle writes). The exact value format of a button write is verified
 2. **`CGlobalVars` internal layout.** Standard Source 2 layout; verify against `dwGlobalVars` on this build.
    Typical: `0x00 realtime`, `0x04 framecount`, `0x10 curtime`, `0x18 maxClients`, `0x1C interval_per_tick`.
 3. **Entity list iteration logic.** Chunks are 512 entries each; `entity_list + 0x10 + (index >> 9) * 0x8` is the
-   chunk pointer; `chunk + (index & 0x1FF) * 0x78` is the entity identity; `identity + 0x0` is the entity pointer;
-   `identity + 0x10` is the serial. This is code, not offsets.
+   chunk pointer; `chunk + (index & 0x1FF) * 0x70` is the entity identity; `identity + 0x0` is the entity pointer;
+   `identity + 0x10` holds the entity's **whole handle** (index + serial); `identity + 0x20` points to the designer
+   name (`weapon_ak47`). Proven live 2026-10-06 (build 14189, `docs/offsets.md` "Entity list"): the identity is
+   **0x70** bytes (this file used to say 0x78, which reads 0) and `+0x10` is the handle, not the bare serial.
 
-### Interfaces from outside the process (`game/interfaces.h`, Phase 2)
-- `CreateInterface` is exported by `tier0.dll` and `client.dll`. Resolve it from the remote process by parsing
-  the remote PE's export directory, or by walking the `InterfaceReg` linked list.
-- `CreateInterface("GameEntitySystem001", nullptr)` returns the entity system pointer, read remotely.
-- `CreateInterface("SchemaSystem_001", nullptr)` returns the schema system pointer.
-- Log every interface pointer at startup; if one is null, disable the features that depend on it.
+### Interfaces from outside the process (`game/interfaces`, done in Phase 2)
+- Every module that registers interfaces exports its own `CreateInterface`. `core/pe` finds the export by parsing the
+  remote PE's export directory; its first instruction, `mov r9, [rip + s_pInterfaceRegs]` (`4C 8B 0D disp32`), gives
+  the head of that module's `InterfaceReg { create, name, next }` list, which we walk with RPM. Each create function
+  is `lea rax, [rip + instance]; ret`, so the instance is decoded from the instruction instead of calling it.
+- `SchemaSystem_001` is in **`schemasystem.dll`**; `Source2Client002` (client.dll), `Source2EngineToClient001`
+  (engine2.dll, "EngineClient"), `InputSystemVersion001` (inputsystem.dll = `dwInputSystem`).
+- **There is no `GameEntitySystem` interface in CS2.** The entity system is the global `client.dll +
+  dwGameEntitySystem` (same RVA as `dwEntityList`).
+- The startup diagnostic logs every interface pointer; when features use one (none yet), a null one disables them.
+
+### Schema system from outside the process (`game/schema_system`, done in Phase 2)
+- `SchemaSystem_001` + `0x190` is a `CUtlVector` of type scopes (count, then data at `+0x198`); a scope's name is a
+  `char[256]` at `+0x8` (`"client.dll"`).
+- Class infos (`SchemaClassInfoData`) are **static data in client.dll** and start with a pointer to themselves, so one
+  pass over a copy of client.dll finds all of them (469 "client" classes in build 14189) without walking the scope's
+  hash table. Layout and field array: `offsets::layout`, proof in `docs/offsets.md`.
+- The schema values the code uses stay **compile-time constants** in `schema.h` (copied from the dump); the live
+  schema is the startup proof, not a runtime override (see the Decision log, Phase 2).
 
 ### Handle resolution (`game/handle.h`, Phase 3)
 Every `m_h*` field (weapons, pawns, observers, defusers) is a `CHandle` (uint32): low 15 bits are the index, high
 bits are the serial. Resolution:
 ```cpp
-index  = handle & 0x7FFF;
-serial = handle >> 15;
-identity = read(entity_list + 0x10 + (index >> 9) * 0x8);
-entry    = read(identity + (index & 0x1FF) * 0x78);
-entity   = read(entry + 0x0);
-if (read<uint32>(entry + 0x10) != serial) return nullptr; // stale
+index    = handle & 0x7FFF;
+chunk    = read(entity_list + 0x10 + (index >> 9) * 0x8);
+identity = chunk + (index & 0x1FF) * 0x70;            // an address, not a read (0x70 proven in build 14189)
+entity   = read(identity + 0x0);
+if ((read<uint32>(identity + 0x10) >> 15) != (handle >> 15)) return nullptr; // stale (+0x10 holds the full handle)
 ```
 
 ### Struct reconstruction approach
@@ -532,9 +567,9 @@ Rules:
 - Never construct, copy-assign into, or `delete` a game object. Read through a validated pointer, copy into a
   `PlayerSnapshot`, write single fields back.
 - Verify each schema offset once at startup; log it.
-- The combined offset for a weapon's `m_iItemDefinitionIndex` from the weapon pointer is 0x14FA (via
-  `m_AttributeManager` → `m_Item` → `m_iItemDefinitionIndex`), but keep the chain explicit in code so it's
-  re-verifiable.
+- The combined offset for a weapon's `m_iItemDefinitionIndex` from the weapon pointer is **0x149A** in build 14189
+  (`m_AttributeManager` 0x1290 → `m_Item` 0x50 → `m_iItemDefinitionIndex` 0x1BA; proven live: an AK-47 reads 7; this
+  file used to say 0x14FA, which reads 0). Keep the chain explicit in code so it's re-verifiable.
 
 ### Validity checks
 - **Pointer sanity:** non-null, in user space (`0x10000 ≤ p < 0x7FFFFFFFFFFF`), 8-byte aligned where required.
@@ -573,6 +608,14 @@ Rules:
   back. The overlay hides when neither the game nor the overlay has focus, or the game is minimised. Home shows the
   logo + name, PID, module bases, match status, active features (local pawn re-read at ~4 Hz), overlay size and FPS. Settings has live Watermark and
   Frame outline switches. The exe carries the logo as its icon. Exit: Ctrl+C / closing the console, Alt+F4 with the menu open, or CS2 closing.
+- **Phase 2 (done, verified in-game 2026-10-06):** after the
+  Phase 0 printout the tool runs the **offset diagnostic** and prints, as `OK` / `FAIL` lines: the game's build number
+  vs the dumps' (14189); the four interfaces found by walking `InterfaceReg` lists (vs `interfaces.json`), the
+  `dwInputSystem` cross-check and the entity system global; the 8 signatures scanned in a copy of client.dll's
+  `.text` (vs the dump); the client type scope and all 29 `schema.h` fields read from the live schema system; then,
+  informational, the `jump`/`attack` button globals and the main `dw*` pointers as they read right now. Last line:
+  `all 45 checks OK` (or how many failed). Home shows an "Offsets" row with the same result. `cs2_external.exe --diag`
+  runs only the diagnostic and exits (0 = all OK, 2 = a check failed). Nothing reads entities yet.
 
 ---
 
@@ -620,6 +663,22 @@ Rules:
   outside user space before calling the implementation (tested with `FakeMemory::read_count()`).
 - **`CreateToolhelp32Snapshot(TH32CS_SNAPMODULE)` can fail with `ERROR_BAD_LENGTH`** while the game is still loading
   modules. `core::module_base` retries.
+- **Scan a copy, not the remote.** `core::copy_remote` reads a whole module (client.dll: 41 MiB) in 1 MiB reads in
+  ~8 ms; every pattern and the schema class index then run on the local copy. Patterns are matched only inside
+  `.text` (`core::pe::find_section`), never the data sections.
+- **Strings: `core::read_string`, never a fixed-size read.** A name near the end of the last mapped page would make
+  a 256-byte read fail; `read_string` reads up to the page end first. In tests, map at least a page (`config::kPageSize`)
+  for strings: FakeMemory regions aren't page-granular, real memory is.
+
+### Signatures
+- **A signature must never match its own displacement.** The disp32 changes every build; `test_offsets` checks that
+  every signature wildcards it. Also wildcard call/jump targets (`E8`/`E9 ? ? ? ?`) and struct offsets inside
+  following instructions (`41 89 BE ? ? ? ?`): both move between builds.
+- **Several matches are fine if they agree.** `dwGameRules`' pattern matches twice (two copies of the same code);
+  `resolve_signature` accepts that and reports `ambiguous` only when matches point at different addresses.
+- **Remembered/public patterns rot.** Three of the a2x-style patterns no longer worked on build 14189. Build new ones
+  from the live module: list every RIP-relative reference to the dumped global, prefer the instruction that **stores**
+  the global (`mov [rip+x], reg`), and check that the pattern matches nowhere else.
 
 ### CS2 / Source 2 specifics
 - **Offsets change on every update.** Subscribe to `a2x/cs2-dumper`. The moment a patch lands, the old offsets are
@@ -638,7 +697,16 @@ Rules:
   mid-read. `safe_read` and validity checks handle this; do not assume a snapshot is internally consistent across
   two separate reads (re-read the whole struct if you need consistency).
 - **Never call a game function.** External has no way to do this safely. Features that need a game-thread call
-  (silent aim, TraceLine) are out of scope for this project.
+  (silent aim, TraceLine) are out of scope for this project. That includes `CreateInterface`: we decode what it would
+  do (`game/interfaces`) instead.
+- **`dwLocalPlayerPawn` has no code reference of its own.** It's a field of the prediction object
+  (`dwPrediction + 0xF8` in build 14189), so its signature finds the prediction and adds the field offset. If the
+  pawn signature breaks after an update, check that offset first.
+- **The dump's class count isn't the live "client" class count.** `client_dll.json` lists 542 classes because other
+  libraries (entity2, pulse_runtime_lib, compositematerialslib) register theirs in the client scope; the live
+  `index_classes(copy, "client")` finds 469. Classes we need come from client itself.
+- **`dwNetworkGameClient_isBackgroundMap` (`0x2C143F`) looks wrong in the dump** (the other `dwNetworkGameClient_*`
+  values are < 0x400). Don't use it without proof.
 
 ### Overlay window
 - **The overlay is a separate topmost window.** It does not hook the game's Present, does not touch the game's
@@ -713,14 +781,14 @@ Rules:
 ## 12. Testing
 
 - **Unit tests** (from Phase 1): `tests` console exe (x64, doctest v2.5.3) that compiles the **pure** sources from
-  `src/external` (plus `core/process_memory.cpp` and `core/pattern.cpp`, which are Win32 but harmless to test) and
-  `tests/**/*.cpp`. Run: `bin\Debug\tests.exe` (and `bin\Release\tests.exe`). When adding a pure `.cpp` under
+  `src/external` (plus `core/process_memory.cpp`, which is Win32 but harmless to test) and `tests/**/*.cpp`.
+  Code that reads remote memory is tested against `FakeMemory`; remote modules against `helpers/fake_pe.h`. Run: `bin\Debug\tests.exe` (and `bin\Release\tests.exe`). When adding a pure `.cpp` under
   test, add it to `tests.vcxproj` too.
 - **In-game tests:** every phase lists acceptance criteria in §13. The user runs them; record the result in §14 and
   DEVLOG.
-- **Offset re-verification test** (after every CS2 update): run the tool, check the console for signature hits,
-  interface pointers, and schema field offsets. Anything null or mismatched is a flag. Cross-check against a fresh
-  `a2x/cs2-dumper` run.
+- **Offset re-verification test** (after every CS2 update): `bin\Release\cs2_external.exe --diag` with CS2 in a bot
+  match. It checks the build number, interfaces, signatures and every schema field and ends with `all N checks OK` or
+  `N of M checks FAILED` (exit code 0 / 2). Any FAIL is a flag. Cross-check against a fresh `a2x/cs2-dumper` run.
 
 ---
 
@@ -771,15 +839,23 @@ through the menu doesn't shoot the game. Alt-tab hides the overlay when the game
 removes the overlay and leaves the game running.
 
 ### Phase 2: Offsets, signatures, interfaces, schema
-- [ ] Copy `dw*` offsets from `docs/dumps/offsets.json` into `offsets.h`, with provenance
-- [ ] Copy the schema fields we need from `docs/dumps/client_dll.json` into `schema.h`, with provenance
-- [ ] `core/pattern`: remote signature scanner (read the module range in chunks, scan locally), tested
-- [ ] `game/interfaces`: resolve `CreateInterface` from outside the process (parse the remote PE export directory,
-      or walk the `InterfaceReg` linked list); look up `GameEntitySystem`, `SchemaSystem`, `Source2Client`,
-      `EngineClient`, `InputSystem`
-- [ ] A diagnostic that prints every signature hit, every interface pointer, and every schema field offset
-- [ ] Builds with zero warnings (Debug + Release); tests pass
-- [ ] Verified in-game by the user
+- [x] Copy `dw*` offsets from `docs/dumps/offsets.json` into `offsets.h`, with provenance (all 29 + 16 buttons +
+      4 interface RVAs, by script)
+- [x] Copy the schema fields we need from `docs/dumps/client_dll.json` into `schema.h`, with provenance (29 fields,
+      13 classes)
+- [x] `core/pattern`: remote signature scanner (read the module range in chunks, scan locally), tested; 8 signatures
+      in `offsets.h`, each proven to resolve to exactly the dump value
+- [x] `game/interfaces`: resolve `CreateInterface` from outside the process (export directory via `core/pe`, then the
+      `InterfaceReg` list); `SchemaSystem_001`, `Source2Client002`, `Source2EngineToClient001`,
+      `InputSystemVersion001`. `GameEntitySystem` turned out not to be an interface (it's the global
+      `dwGameEntitySystem`, checked instead)
+- [x] A diagnostic that prints every signature hit, every interface pointer, and every schema field offset, each
+      checked against the live game (`app/diagnostics`, `--diag`); the schema values are read from the game's own
+      schema system (`game/schema_system`)
+- [x] Builds with zero warnings (Debug + Release); `tests.exe` 41/41 in both. `--diag` against the live game (build
+      14189, offline bot match): all 45 checks OK
+- [x] Verified in-game by the user (2026-10-06, build 14189, offline bot match): normal start printed all 45
+      checks OK, then the overlay started; approved for commit
 
 **Acceptance:** the console shows non-null interface pointers, every schema field offset (health, team, life
 state, origin, view offset, eye angles, weapon services, active weapon, shots fired, dormant, flags, scoped,
@@ -969,8 +1045,15 @@ why, build it and use it, from the README alone.
   indicator + visible colours (Phase 4), visible-only aimbot and a fully configurable triggerbot (Phase 5). All
   external; visibility is the spotted-by heuristic (§3 feasibility table).
 
-**Next:** Phase 2 (offsets, signatures, interfaces, schema), in a new session. Include the new fields in §7's
-"Fields and buttons the planned features need" table.
+- **Phase 2: done, verified in-game by the user (2026-10-06: all 45 checks OK), approved, committed and pushed.** Debug + Release
+  build with zero warnings, tests 41/41. CS2 was running during the session (build 14189, `-insecure`, bot match),
+  so every layout was proven live with a read-only scratch script before the C++ was written, and `--diag` was run
+  here against the game: **all 45 checks OK**. Found and fixed in CLAUDE.md: the weapon id chain is `0x149A`, an entity
+  identity is `0x70` bytes, `identity + 0x10` is the full handle (all three were wrong before, proven live).
+  **No offset in code changed**: everything new was copied from the dumps, and the dump values all matched.
+
+**Next:** Phase 3 (entity list + snapshots) in a new session, using the corrected entity list layout (§7, and
+`docs/offsets.md` "Entity list").
 
 ---
 
@@ -1065,6 +1148,27 @@ why, build it and use it, from the README alone.
   modes, filters; Phase 5). Phase 6 became "Misc" (bunny hop + radar, bomb timer, spectators, hitsound, previously
   unscheduled). Button writes (jump, attack) join the aimbot's angle write as the only game writes; the write handle
   arrives in Phase 5. The UI placeholders and `features::ActiveFeatures` (now with `bunny_hop`) match this plan.
+- **2026-10-06 (Phase 2):** **The dump values stay in charge; the live game is the proof, not a runtime override.**
+  `offsets.h` / `schema.h` are compile-time constants copied from the dumps. At startup, `app/diagnostics` proves them
+  (signatures, the live schema system, the build number) and only *reports* a mismatch. Reason: §7's offset change
+  rule (prove, keep the old value, log it) needs a human in the loop, constants keep `game/` code testable without a
+  live schema, and a silently self-updating offset would hide exactly the breakage we want to see. The live values
+  are one step away if that ever changes (the diagnostic already has them).
+- **2026-10-06 (Phase 2):** **Prove before coding.** CS2 was running, so every engine layout (InterfaceReg, the schema
+  system, class infos, signatures) was first checked against the live process with a read-only Python/ctypes script
+  in the session's scratch folder (not in the repo), then written in C++ and checked again by `--diag`.
+- **2026-10-06 (Phase 2):** Schema classes are found by **scanning a copy of client.dll for self-pointing class
+  infos** (one pass, 469 classes), not by walking the type scope's `CUtlTSHash`. The hash table layout is complex
+  and changes; the self pointer + name + module layout is simple, and each info's type-scope pointer still ties it
+  to `SchemaSystem_001`. Revisit if a class we need ever goes missing from the index.
+- **2026-10-06 (Phase 2):** One `core::copy_remote` of client.dll (41 MiB, ~8 ms) serves both the signature scan and
+  the class index, then is freed. Signatures only scan `.text`.
+- **2026-10-06 (Phase 2):** `--diag` command-line flag (diagnostic only, then exit; exit code 0/2), so the
+  after-every-update check (§13) doesn't need the overlay. New files beyond the plan: `core/pe`, `game/schema_system`,
+  `game/signatures`, `app/diagnostics`, `tests/helpers/fake_pe.h`.
+- **2026-10-06 (Phase 2):** CLAUDE.md corrected after live proof: weapon id chain `0x149A` (was `0x14FA`), entity
+  identity `0x70` (was `0x78`), `identity + 0x10` = full handle (was "serial"), no `GameEntitySystem` interface,
+  `SchemaSystem_001` lives in `schemasystem.dll`.
 
 ---
 
