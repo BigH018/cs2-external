@@ -4,6 +4,7 @@
 //
 // PURE: no <Windows.h>.
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
@@ -51,6 +52,9 @@ inline constexpr std::uint32_t kLiveViewIntervalMs = 250;
 inline constexpr std::uint32_t kMaxPlayers = 64;          // player controllers live at entity indices 1..64
 inline constexpr std::size_t kPlayerNameLength = 128;     // CBasePlayerController::m_iszPlayerName is char[128]
 inline constexpr std::int32_t kMaxSaneHealth = 10000;     // more than this = a garbage read
+inline constexpr float kMaxBoneDistance = 200.0f;         // a bone further from the feet (units) = a garbage read
+inline constexpr float kMinHeadHeight = 30.0f;            // --diag: the head bone's height above the feet (units),
+inline constexpr float kMaxHeadHeight = 80.0f;            //   crouching (~45) to standing (~60), with margin
 
 // --- Keys ----------------------------------------------------------------------------------------------------------
 // Temporary hard-coded menu key until the Phase 7 keybind engine. Virtual-key code VK_INSERT (no <Windows.h> here).
@@ -75,6 +79,32 @@ inline constexpr float kHomeLogoSize = 96.0f;   // the logo on the Home page
 // --- Overlay -------------------------------------------------------------------------------------------------------
 inline constexpr float kWatermarkMargin = 10.0f;   // from the top-left corner of the game's client area
 inline constexpr float kFrameOutlineThickness = 2.0f;
+
+// --- Setting ranges ------------------------------------------------------------------------------------------------
+// Each numeric setting's range, defined once: the menu's sliders use it, and Phase 8 clamps loaded profiles to it.
+template <class T>
+struct Range
+{
+    T min;
+    T max;
+
+    [[nodiscard]] constexpr bool contains(T value) const noexcept { return value >= min && value <= max; }
+    [[nodiscard]] constexpr T clamp(T value) const noexcept { return std::clamp(value, min, max); }
+};
+
+inline constexpr Range<float> kEspThickness{1.0f, 4.0f};     // pixels
+inline constexpr Range<float> kEspMaxDistance{0.0f, 300.0f}; // metres; 0 = no limit
+
+// --- ESP drawing (Phase 4) -----------------------------------------------------------------------------------------
+inline constexpr float kEspFontSize = 15.0f;         // labels over the bots, in pixels
+inline constexpr float kEspBoxAspect = 0.5f;         // box width = height * this
+inline constexpr float kEspBoxTopAboveEye = 8.0f;    // world units from the eyes to the top of the box
+inline constexpr float kEspHeadRadius = 5.0f;        // world units, for the head circle
+inline constexpr float kEspLabelGap = 2.0f;          // pixels between the box and a label
+inline constexpr float kEspHealthBarWidth = 3.0f;    // pixels
+inline constexpr float kEspHealthBarGap = 3.0f;      // pixels between the box and the health bar
+inline constexpr float kEspCornerFraction = 0.25f;   // corner box: each corner's arms = this much of the side
+inline constexpr std::size_t kEspMaxNameLength = 20; // longer names are cut with "..."
 
 // --- Timing --------------------------------------------------------------------------------------------------------
 inline constexpr std::uint32_t kStatusIntervalMs = 250;     // match status read on the Home page (~4 Hz)

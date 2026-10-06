@@ -67,7 +67,7 @@ Mode parse_mode(int argc, char* argv[])
 
 int run(Mode mode)
 {
-    logger::info("CS2 External - Phase 3 (offline only: -insecure, bots, never a VAC server)");
+    logger::info("CS2 External - Phase 4 (offline only: -insecure, bots, never a VAC server)");
 
     const auto pid = core::find_process(config::kGameExe);
     if (!pid)

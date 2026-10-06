@@ -3,10 +3,12 @@
 #include <utility>
 
 #include "config.h"
+#include "game/bones.h"
 #include "game/handle.h"
 #include "game/offsets.h"
 #include "game/schema.h"
 #include "game/view.h"
+#include "game/visibility.h"
 #include "game/weapon.h"
 
 namespace game
@@ -56,6 +58,8 @@ void read_pawn(const core::Memory& memory, std::uintptr_t entity_system, std::ui
     player.flags = memory.read<std::uint32_t>(pawn + base_entity::m_fFlags).value_or(0);
     player.scoped = read_flag(memory, pawn + schema::C_CSPlayerPawn::m_bIsScoped);
     player.weapon_id = read_active_weapon_id(memory, entity_system, pawn);
+    player.spotted_by_mask = read_spotted_by_mask(memory, pawn).value_or(0);
+    player.bones = read_bones(memory, *scene_node, *origin);
 }
 } // namespace
 

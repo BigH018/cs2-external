@@ -11,7 +11,9 @@
 #include <vector>
 
 #include "game/globals.h"
+#include "game/visibility.h"
 #include "maths/projection.h"
+#include "maths/skeleton.h"
 #include "maths/vec.h"
 
 namespace game
@@ -47,8 +49,16 @@ struct PlayerSnapshot
     std::uint32_t flags = 0;       // m_fFlags (bit 0 = on the ground)
     bool scoped = false;
     std::optional<std::uint16_t> weapon_id;
+    std::uint64_t spotted_by_mask = 0;  // a bit per player slot that can see this pawn (game/visibility)
+    std::optional<maths::Bones> bones;  // world positions (maths/skeleton.h), if the bone array read sanely
 
     [[nodiscard]] maths::Vec3 eye_position() const noexcept { return origin + view_offset; }
+    // The head: its bone if the bones were read, otherwise the eye position.
+    [[nodiscard]] maths::Vec3 head_position() const noexcept
+    {
+        return bones ? (*bones)[maths::bone::kHead] : eye_position();
+    }
+    [[nodiscard]] std::uint32_t slot() const noexcept { return player_slot(index); }
     [[nodiscard]] bool on_ground() const noexcept { return (flags & kFlagOnGround) != 0; }
 };
 

@@ -3,8 +3,9 @@
 // The orchestrator (same role as in the AC project): the only place that wires the overlay window, ImGui, game reads
 // and the menu together, one frame at a time. Main thread only.
 //
-// One frame (Phase 1): pump messages -> follow the game window and focus -> menu key -> status read (~4 Hz) -> HUD +
-// menu -> present. Later phases slot keybinds, game snapshots, features and writes in between (CLAUDE.md §6.3).
+// One frame: pump messages -> follow the game window and focus -> menu key -> game snapshot (every frame while the ESP
+// is on, ~4 Hz otherwise) -> ESP -> HUD + menu -> present. Later phases slot keybinds, more features and writes in
+// between (CLAUDE.md §6.3).
 
 #include <Windows.h>
 

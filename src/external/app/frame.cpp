@@ -1,12 +1,19 @@
 #include "app/frame.h"
 
 #include <cstdint>
+#include <vector>
+
+#include <imgui.h>
 
 #include "app/state.h"
 #include "config.h"
 #include "core/log.h"
 #include "core/runtime.h"
+#include "features/esp.h"
 #include "game/player.h"
+#include "maths/vec.h"
+#include "render/painter.h"
+#include "render/primitives.h"
 #include "ui/hud.h"
 #include "ui/imgui_layer.h"
 #include "ui/menu.h"
@@ -117,10 +124,12 @@ private:
             return true;
         }
         follow(area);
-        read_status();
+        state_.active.esp = state_.settings.esp.enabled;
+        read_game();
 
         imgui_.begin_frame();
         state_.fps = imgui_.framerate();
+        draw_esp();
         ui::draw_hud(imgui_.fonts(), imgui_.logo(), state_);
         if (state_.menu_open)
         {
@@ -186,10 +195,12 @@ private:
         overlay_.set_visible(true);
     }
 
-    void read_status()
+    // The game snapshot: every frame while a feature draws from it, otherwise at ~4 Hz for the Home page.
+    void read_game()
     {
         const std::uint64_t now = GetTickCount64();
-        if (now < next_status_ms_)
+        const bool every_frame = state_.active.esp;
+        if (!every_frame && now < next_status_ms_)
         {
             return;
         }
@@ -210,6 +221,16 @@ private:
                 logger::info("Not in a match");
             }
         }
+    }
+
+    // Under the watermark and the menu, on ImGui's background draw list.
+    void draw_esp()
+    {
+        const maths::Vec2 screen{static_cast<float>(state_.overlay_width), static_cast<float>(state_.overlay_height)};
+        const float font_size = ui::scaled(config::kEspFontSize);
+        const std::vector<render::Primitive> primitives =
+            features::build_esp(state_.snapshot, state_.settings.esp, screen, font_size);
+        render::paint(*ImGui::GetBackgroundDrawList(), primitives, imgui_.fonts().regular, font_size);
     }
 
     void open_menu()

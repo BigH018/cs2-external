@@ -4,6 +4,7 @@
 #include <array>
 #include <chrono>
 #include <format>
+#include <limits>
 #include <map>
 #include <optional>
 #include <string>
@@ -16,6 +17,7 @@
 #include "core/pe.h"
 #include "game/interfaces.h"
 #include "game/offsets.h"
+#include "game/player.h"
 #include "game/schema.h"
 #include "game/schema_system.h"
 #include "game/signatures.h"
@@ -267,6 +269,50 @@ void show_globals(const core::Memory& memory, const core::ModuleInfo& client)
                      ? std::string("all zero (no frame drawn yet)")
                      : std::format("row 0 = {:.3f} {:.3f} {:.3f} {:.3f}", matrix[0], matrix[1], matrix[2], matrix[3]));
 }
+
+// --- 6. Match reads (only in a match) ------------------------------------------------------------------------------
+// The hand-found layouts the dumps can't vouch for (CGlobalVars, the bone array), checked on live players.
+void check_match(Tally& tally, const core::Memory& memory, const core::ModuleInfo& client)
+{
+    const game::GameSnapshot game = game::read_game(memory, client.base);
+    if (!game.in_match)
+    {
+        logger::info("Match reads: not in a match, skipped (join Practice with Bots to check globals and bones)");
+        return;
+    }
+    logger::info("Match reads (hand-found layouts: CGlobalVars, bones)");
+    const game::GlobalVars& globals = game.globals;
+    tally.check(globals.is_sane(), std::format("{:<26} map {}, max clients {}, tick interval {:.4f}", "CGlobalVars",
+                                               globals.map_name.empty() ? "?" : globals.map_name, globals.max_clients,
+                                               globals.interval_per_tick));
+
+    int alive = 0;
+    int with_bones = 0;
+    float lowest_head = std::numeric_limits<float>::max();
+    float highest_head = std::numeric_limits<float>::lowest();
+    for (const game::PlayerSnapshot& player : game.players)
+    {
+        if (!player.alive)
+        {
+            continue;
+        }
+        ++alive;
+        if (player.bones)
+        {
+            ++with_bones;
+            const float above = (*player.bones)[maths::bone::kHead].z - player.origin.z;
+            lowest_head = std::min(lowest_head, above);
+            highest_head = std::max(highest_head, above);
+        }
+    }
+    // A standing head bone sits ~60 units above the feet, a crouching one ~45.
+    const bool heads_ok = with_bones > 0 && lowest_head >= config::kMinHeadHeight &&
+                          highest_head <= config::kMaxHeadHeight;
+    tally.check(alive > 0 && with_bones == alive && heads_ok,
+                std::format("{:<26} {} of {} alive players; head bone {:.0f} to {:.0f} units above the feet",
+                            "Bones (model state + 0x80)", with_bones, alive, with_bones > 0 ? lowest_head : 0.0f,
+                            with_bones > 0 ? highest_head : 0.0f));
+}
 } // namespace
 
 OffsetReport run_diagnostics(const core::Memory& memory, DWORD pid, const core::ModuleInfo& client,
@@ -292,6 +338,7 @@ OffsetReport run_diagnostics(const core::Memory& memory, DWORD pid, const core::
     check_signatures(tally, client_copy, text);
     check_schema(tally, memory, schema_system, client_copy);
     show_globals(memory, client);
+    check_match(tally, memory, client);
 
     report.checks = tally.checks();
     report.failures = tally.failures();

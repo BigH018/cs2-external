@@ -122,11 +122,11 @@ void draw_frame_outline(ImDrawList* draw)
 void draw_hud(const Fonts& fonts, ImTextureData* logo, const app::AppState& app)
 {
     ImDrawList* draw = ImGui::GetBackgroundDrawList();
-    if (app.overlay.frame_outline)
+    if (app.settings.overlay.frame_outline)
     {
         draw_frame_outline(draw);
     }
-    if (app.overlay.watermark)
+    if (app.settings.overlay.watermark)
     {
         draw_watermark(fonts, logo, draw, app);
     }

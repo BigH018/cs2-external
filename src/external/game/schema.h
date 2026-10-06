@@ -40,6 +40,13 @@ inline constexpr std::uintptr_t m_vecAbsOrigin = 0xC8;  // 200, Vector (world po
 inline constexpr std::uintptr_t m_bDormant     = 0x103; // 259, bool
 } // namespace CGameSceneNode
 
+// A pawn's scene node is a CSkeletonInstance (child of CGameSceneNode). Its model state leads to the bone array
+// (offsets::layout::kModelStateBones, hand-found).
+namespace CSkeletonInstance
+{
+inline constexpr std::uintptr_t m_modelState = 0x140; // 320, CModelState (embedded)
+} // namespace CSkeletonInstance
+
 namespace C_BaseModelEntity
 {
 inline constexpr std::uintptr_t m_vecViewOffset = 0xF60; // 3936, CNetworkViewOffsetVector (eye height)
@@ -126,6 +133,7 @@ inline constexpr std::array kFields{
     Field{"C_BaseEntity", "m_vecVelocity", C_BaseEntity::m_vecVelocity},
     Field{"CGameSceneNode", "m_vecAbsOrigin", CGameSceneNode::m_vecAbsOrigin},
     Field{"CGameSceneNode", "m_bDormant", CGameSceneNode::m_bDormant},
+    Field{"CSkeletonInstance", "m_modelState", CSkeletonInstance::m_modelState},
     Field{"C_BaseModelEntity", "m_vecViewOffset", C_BaseModelEntity::m_vecViewOffset},
     Field{"C_BasePlayerPawn", "m_pWeaponServices", C_BasePlayerPawn::m_pWeaponServices},
     Field{"C_BasePlayerPawn", "m_hController", C_BasePlayerPawn::m_hController},

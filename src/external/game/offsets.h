@@ -233,5 +233,13 @@ inline constexpr std::uintptr_t kGlobalsCurtime = 0x30;        // float, game ti
 inline constexpr std::uintptr_t kGlobalsTickCount = 0x44;      // int32
 inline constexpr std::uintptr_t kGlobalsMapName = 0x188;       // const char*, "de_mirage"
 inline constexpr std::size_t kGlobalsReadSize = 0x190;         // one read covers every field above
+
+// --- Bones (pawn -> m_pGameSceneNode (a CSkeletonInstance) + m_modelState + 0x80 -> bone array) ---
+// Not in any dump. Found 2026-10-06 (build 14189) in a bot match: for all 20 pawns the pointer at model state + 0x80
+// leads to an array of 32-byte bones { Vector position; float scale (1.0); Quaternion rotation }, whose positions sit
+// on the pawn (within ~22 units sideways, -1.5 to +64 units up). The indices (game/bones.h) were mapped from those
+// positions in each bot's own frame, on CT and T models alike.
+inline constexpr std::uintptr_t kModelStateBones = 0x80;
+inline constexpr std::size_t kBoneStride = 0x20;
 } // namespace layout
 } // namespace game::offsets

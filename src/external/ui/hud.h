@@ -1,7 +1,7 @@
 #pragma once
 
 // What the overlay draws on the game every frame, menu open or not (ImGui's background draw list): the watermark and
-// the optional frame outline. Phase 4 adds the ESP next to it through render/painter.
+// the optional frame outline. The ESP is drawn just before it, by app/frame through render/painter.
 
 #include <imgui.h>
 

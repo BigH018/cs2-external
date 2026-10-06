@@ -81,7 +81,14 @@
     <ClCompile Include="game\test_view.cpp" />
     <ClCompile Include="game\test_weapon.cpp" />
     <ClCompile Include="maths\test_vec.cpp" />
+    <ClCompile Include="features\test_esp.cpp" />
     <ClCompile Include="features\test_feature_summary.cpp" />
+    <ClCompile Include="game\test_bones.cpp" />
+    <ClCompile Include="game\test_visibility.cpp" />
+    <ClCompile Include="maths\test_projection.cpp" />
+    <ClCompile Include="maths\test_skeleton.cpp" />
+    <ClCompile Include="settings\test_settings.cpp" />
+    <ClCompile Include="test_color.cpp" />
   </ItemGroup>
   <ItemGroup Label="Sources under test">
     <!-- Compiled straight from src/external (pure modules + core/process_memory). -->
@@ -97,7 +104,12 @@
     <ClCompile Include="..\src\external\game\signatures.cpp" />
     <ClCompile Include="..\src\external\game\view.cpp" />
     <ClCompile Include="..\src\external\game\weapon.cpp" />
+    <ClCompile Include="..\src\external\features\esp.cpp" />
     <ClCompile Include="..\src\external\features\feature_summary.cpp" />
+    <ClCompile Include="..\src\external\game\bones.cpp" />
+    <ClCompile Include="..\src\external\game\visibility.cpp" />
+    <ClCompile Include="..\src\external\maths\projection.cpp" />
+    <ClCompile Include="..\src\external\maths\skeleton.cpp" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

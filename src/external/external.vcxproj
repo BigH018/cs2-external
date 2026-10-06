@@ -62,7 +62,9 @@
     <ClCompile Include="core\pe.cpp" />
     <ClCompile Include="core\process.cpp" />
     <ClCompile Include="core\process_memory.cpp" />
+    <ClCompile Include="features\esp.cpp" />
     <ClCompile Include="features\feature_summary.cpp" />
+    <ClCompile Include="game\bones.cpp" />
     <ClCompile Include="game\entities.cpp" />
     <ClCompile Include="game\globals.cpp" />
     <ClCompile Include="game\handle.cpp" />
@@ -71,7 +73,11 @@
     <ClCompile Include="game\schema_system.cpp" />
     <ClCompile Include="game\signatures.cpp" />
     <ClCompile Include="game\view.cpp" />
+    <ClCompile Include="game\visibility.cpp" />
     <ClCompile Include="game\weapon.cpp" />
+    <ClCompile Include="maths\projection.cpp" />
+    <ClCompile Include="maths\skeleton.cpp" />
+    <ClCompile Include="render\painter.cpp" />
     <ClCompile Include="ui\hud.cpp" />
     <ClCompile Include="ui\imgui_layer.cpp" />
     <ClCompile Include="ui\menu.cpp" />
@@ -86,6 +92,7 @@
     <ClCompile Include="ui\pages\triggerbot_page.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="color.h" />
     <ClInclude Include="config.h" />
     <ClInclude Include="app\diagnostics.h" />
     <ClInclude Include="app\frame.h" />
@@ -98,7 +105,9 @@
     <ClInclude Include="core\process.h" />
     <ClInclude Include="core\process_memory.h" />
     <ClInclude Include="core\runtime.h" />
+    <ClInclude Include="features\esp.h" />
     <ClInclude Include="features\feature_summary.h" />
+    <ClInclude Include="game\bones.h" />
     <ClInclude Include="game\entities.h" />
     <ClInclude Include="game\globals.h" />
     <ClInclude Include="game\handle.h" />
@@ -110,9 +119,14 @@
     <ClInclude Include="game\signatures.h" />
     <ClInclude Include="game\snapshot.h" />
     <ClInclude Include="game\view.h" />
+    <ClInclude Include="game\visibility.h" />
     <ClInclude Include="game\weapon.h" />
     <ClInclude Include="maths\projection.h" />
+    <ClInclude Include="maths\skeleton.h" />
     <ClInclude Include="maths\vec.h" />
+    <ClInclude Include="render\painter.h" />
+    <ClInclude Include="render\primitives.h" />
+    <ClInclude Include="settings\settings.h" />
     <ClInclude Include="ui\hud.h" />
     <ClInclude Include="ui\imgui_layer.h" />
     <ClInclude Include="ui\logo_pixels.h" />

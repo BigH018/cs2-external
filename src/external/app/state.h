@@ -1,13 +1,14 @@
 #pragma once
 
 // Everything the app keeps between frames that the menu also shows or edits. Main thread only, so no locks.
-// Plain data: the menu edits `overlay`; app/frame fills in the rest.
+// Plain data: the menu edits `settings`; app/frame fills in the rest.
 
 #include <cstdint>
 
 #include "core/process.h"
 #include "features/feature_summary.h"
 #include "game/snapshot.h"
+#include "settings/settings.h"
 
 namespace app
 {
@@ -30,21 +31,13 @@ struct OffsetReport
     [[nodiscard]] bool ok() const noexcept { return ran && failures == 0; }
 };
 
-// Options for the overlay itself. Applied live. Phase 6 moves them into settings::Settings, Phase 8 saves them.
-struct OverlayOptions
-{
-    bool watermark = true;      // logo, "External Cheat by BigH" and the active features, top-left
-    bool frame_outline = false; // a thin outline along the overlay's edges, to check that it covers the game exactly
-};
-
 struct AppState
 {
     GameInfo game;
     OffsetReport offsets;
-    OverlayOptions overlay;
+    settings::Settings settings; // edited by the menu, applied live by app/frame
 
-    // Which features are on, for the watermark. Filled from the settings by app/frame once features exist
-    // (Phase 4+); all off until then.
+    // Which features are on, for the watermark. Filled from the settings by app/frame every frame.
     features::ActiveFeatures active;
 
     bool menu_open = false;
@@ -53,7 +46,7 @@ struct AppState
     // Match status, refreshed every config::kStatusIntervalMs while the overlay is visible.
     bool pawn_read_ok = false;
     std::uintptr_t local_pawn = 0; // 0 = no local pawn (main menu, loading screen)
-    game::GameSnapshot snapshot;   // every player, globals, view matrix (Phase 3: for the Home page)
+    game::GameSnapshot snapshot;   // every player, globals, view matrix: every frame while a feature needs it
 
     int overlay_width = 0; // the game's client area, which the overlay covers
     int overlay_height = 0;
