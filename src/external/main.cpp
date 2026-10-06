@@ -5,11 +5,13 @@
 
 #include <Windows.h>
 
+#include "app/frame.h"
 #include "config.h"
 #include "core/log.h"
 #include "core/memory.h"
 #include "core/process.h"
 #include "core/process_memory.h"
+#include "core/runtime.h"
 #include "game/player.h"
 
 namespace
@@ -26,9 +28,27 @@ void log_module(std::string_view name, const core::ModuleInfo& module)
     logger::info("{:<12} base 0x{:X}  size 0x{:X}", name, module.base, module.size);
 }
 
+// Runs on a thread Windows creates for the event. It only sets flags; the main thread does the shutdown.
+BOOL WINAPI on_console_event(DWORD event) noexcept
+{
+    core::shutdown_requested = true;
+    if (event == CTRL_C_EVENT || event == CTRL_BREAK_EVENT)
+    {
+        return TRUE; // handled: the main loop exits on its own
+    }
+    // Console closed, logoff, shutdown: Windows ends the process as soon as this returns, so give the main thread time
+    // to remove the overlay and close the handle first.
+    const ULONGLONG deadline = GetTickCount64() + config::kShutdownWaitMs;
+    while (!core::shutdown_complete && GetTickCount64() < deadline)
+    {
+        Sleep(10);
+    }
+    return TRUE;
+}
+
 int run()
 {
-    logger::info("CS2 External - Phase 0 (offline only: -insecure, bots, never a VAC server)");
+    logger::info("CS2 External - Phase 1 (offline only: -insecure, bots, never a VAC server)");
 
     const auto pid = core::find_process(config::kGameExe);
     if (!pid)
@@ -71,7 +91,7 @@ int run()
     }
     if (*pawn == 0)
     {
-        logger::info("local pawn   none (not in a match - join Practice with Bots and run again)");
+        logger::info("local pawn   none (not in a match - join Practice with Bots)");
     }
     else if (!core::is_plausible_pointer(*pawn, alignof(std::uintptr_t)))
     {
@@ -81,12 +101,18 @@ int run()
     {
         logger::info("local pawn   0x{:X}", *pawn);
     }
-    return 0;
+
+    return app::run(app::Context{*pid, opened.handle.get(), memory, *client, *engine});
 }
 } // namespace
 
 int main()
 {
+    // Before any window exists: overlay coordinates are then physical pixels, the same as the game's client area at
+    // any Windows display scaling. Fails harmlessly if a manifest already set it.
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    SetConsoleCtrlHandler(&on_console_event, TRUE);
+
     int exit_code = 1;
     try
     {
@@ -96,6 +122,10 @@ int main()
     {
         logger::error("Unhandled exception: {}", e.what());
     }
-    wait_for_enter();
+    core::shutdown_complete = true;
+    if (!core::shutdown_requested)
+    {
+        wait_for_enter(); // keep the console readable when the tool was started by double-click
+    }
     return exit_code;
 }

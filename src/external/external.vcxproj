@@ -38,6 +38,7 @@
 
   <ImportGroup Label="PropertySheets">
     <Import Project="..\..\props\common.props" />
+    <Import Project="..\..\props\imgui.props" />
   </ImportGroup>
 
   <PropertyGroup>
@@ -47,23 +48,61 @@
   <ItemDefinitionGroup>
     <Link>
       <SubSystem>Console</SubSystem>
+      <!-- d3d11: the overlay's own device. dwmapi: per-pixel transparency. d3dcompiler: ImGui's DX11 backend. -->
+      <AdditionalDependencies>d3d11.lib;dwmapi.lib;d3dcompiler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
 
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="app\frame.cpp" />
     <ClCompile Include="core\process.cpp" />
     <ClCompile Include="core\process_memory.cpp" />
+    <ClCompile Include="features\feature_summary.cpp" />
     <ClCompile Include="game\player.cpp" />
+    <ClCompile Include="ui\hud.cpp" />
+    <ClCompile Include="ui\imgui_layer.cpp" />
+    <ClCompile Include="ui\menu.cpp" />
+    <ClCompile Include="ui\overlay_window.cpp" />
+    <ClCompile Include="ui\theme.cpp" />
+    <ClCompile Include="ui\widgets.cpp" />
+    <ClCompile Include="ui\pages\aimbot_page.cpp" />
+    <ClCompile Include="ui\pages\esp_page.cpp" />
+    <ClCompile Include="ui\pages\home_page.cpp" />
+    <ClCompile Include="ui\pages\misc_page.cpp" />
+    <ClCompile Include="ui\pages\settings_page.cpp" />
+    <ClCompile Include="ui\pages\triggerbot_page.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="config.h" />
+    <ClInclude Include="app\frame.h" />
+    <ClInclude Include="app\state.h" />
     <ClInclude Include="core\log.h" />
     <ClInclude Include="core\memory.h" />
     <ClInclude Include="core\process.h" />
     <ClInclude Include="core\process_memory.h" />
+    <ClInclude Include="core\runtime.h" />
+    <ClInclude Include="features\feature_summary.h" />
     <ClInclude Include="game\offsets.h" />
     <ClInclude Include="game\player.h" />
+    <ClInclude Include="ui\hud.h" />
+    <ClInclude Include="ui\imgui_layer.h" />
+    <ClInclude Include="ui\logo_pixels.h" />
+    <ClInclude Include="ui\menu.h" />
+    <ClInclude Include="ui\overlay_window.h" />
+    <ClInclude Include="ui\theme.h" />
+    <ClInclude Include="ui\widgets.h" />
+    <ClInclude Include="ui\pages\pages.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The exe's icon (assets/logo.ico). -->
+    <ResourceCompile Include="external.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Builds vendor.lib (Dear ImGui) first and links it. -->
+    <ProjectReference Include="..\..\external\vendor.vcxproj">
+      <Project>{45DA1D2F-8C57-41C0-9417-C5A03EEF28DA}</Project>
+    </ProjectReference>
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

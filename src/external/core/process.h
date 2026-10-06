@@ -57,4 +57,10 @@ struct OpenResult
 
 // Base address and size of `module_name` (case-insensitive) in process `pid`, if it is loaded.
 [[nodiscard]] std::optional<ModuleInfo> module_base(DWORD pid, std::wstring_view module_name);
+
+// The process's main window: its largest visible, unowned top-level window. nullptr while it has none (still loading).
+[[nodiscard]] HWND find_main_window(DWORD pid) noexcept;
+
+// True while the process behind `process` (opened with PROCESS_QUERY_LIMITED_INFORMATION) is still running.
+[[nodiscard]] bool is_running(HANDLE process) noexcept;
 } // namespace core

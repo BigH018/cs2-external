@@ -67,11 +67,13 @@
     <ClCompile Include="core\test_memory.cpp" />
     <ClCompile Include="core\test_process_memory.cpp" />
     <ClCompile Include="game\test_player.cpp" />
+    <ClCompile Include="features\test_feature_summary.cpp" />
   </ItemGroup>
   <ItemGroup Label="Sources under test">
     <!-- Compiled straight from src/external (pure modules + core/process_memory). -->
     <ClCompile Include="..\src\external\core\process_memory.cpp" />
     <ClCompile Include="..\src\external\game\player.cpp" />
+    <ClCompile Include="..\src\external\features\feature_summary.cpp" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

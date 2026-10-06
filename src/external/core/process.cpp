@@ -16,6 +16,36 @@ bool names_equal(const wchar_t* a, std::wstring_view b) noexcept
 {
     return CompareStringOrdinal(a, -1, b.data(), static_cast<int>(b.size()), TRUE) == CSTR_EQUAL;
 }
+
+struct WindowSearch
+{
+    DWORD pid = 0;
+    HWND best = nullptr;
+    LONG best_area = 0;
+};
+
+BOOL CALLBACK consider_window(HWND window, LPARAM param) noexcept
+{
+    auto& search = *reinterpret_cast<WindowSearch*>(param);
+    DWORD owner_pid = 0;
+    GetWindowThreadProcessId(window, &owner_pid);
+    if (owner_pid != search.pid || !IsWindowVisible(window) || GetWindow(window, GW_OWNER) != nullptr)
+    {
+        return TRUE;
+    }
+    RECT client{};
+    if (!GetClientRect(window, &client))
+    {
+        return TRUE;
+    }
+    const LONG area = (client.right - client.left) * (client.bottom - client.top);
+    if (search.best == nullptr || area > search.best_area)
+    {
+        search.best = window;
+        search.best_area = area;
+    }
+    return TRUE;
+}
 } // namespace
 
 UniqueHandle::UniqueHandle(HANDLE handle) noexcept : handle_(handle == INVALID_HANDLE_VALUE ? nullptr : handle)
@@ -107,5 +137,19 @@ std::optional<ModuleInfo> module_base(DWORD pid, std::wstring_view module_name)
         }
     }
     return std::nullopt;
+}
+
+HWND find_main_window(DWORD pid) noexcept
+{
+    WindowSearch search;
+    search.pid = pid;
+    EnumWindows(&consider_window, reinterpret_cast<LPARAM>(&search));
+    return search.best;
+}
+
+bool is_running(HANDLE process) noexcept
+{
+    DWORD exit_code = 0;
+    return GetExitCodeProcess(process, &exit_code) != FALSE && exit_code == STILL_ACTIVE;
 }
 } // namespace core
