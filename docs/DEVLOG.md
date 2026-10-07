@@ -312,3 +312,35 @@ User decision: bunny hop is out (advised it's an internal-style feature that fee
 plan (CLAUDE.md §3, Phase 6), the Misc page placeholder, `features::ActiveFeatures` and the watermark names (test
 updated). The proven `jump` button format stays in `docs/offsets.md`. Also checked: server.dll has no console variable
 for the spotting re-check interval (`CCSEntitySpotting` is a built-in game system), so the ~0.5 s can't be tuned.
+
+## 2026-10-07: Phase 6 started, radar (1 of 4)
+
+Phase 6 is done one feature at a time, each checked in-game by the user. First: the **radar**, our own, drawn by the
+overlay (the game's radar isn't touched, nothing is written to the game).
+
+- `features/radar` (pure): `radar_panel` (corner), `radar_offset` (world → radar, rotated so where you look is up, or
+  north-up = world +y like the game's radar), `radar_direction` (a player's yaw on the radar), `clamp_to_square`,
+  `build_radar` → primitives: background, cross, half-range ring, border, range label, a dot per player (enemy
+  visible / hidden from the spotted-by mask, teammates in teams mode), facing lines, names, out-of-range players faded
+  on the edge, your arrow.
+- `settings::RadarSettings` (off by default; top-right, 260 px, 40 m, dots 4 px, rotate on) + ranges in `config.h`.
+- Misc page: Radar and Radar colours cards; the other three Phase 6 features listed as coming next.
+- `render`: `FilledCircle`, `FilledTriangle`, `TextAnchor::bottom_right`.
+- `PlayerSnapshot::eye_angles` from `m_angEyeAngles` (already in `schema.h`), proven live on all 19 bots (`docs/offsets.md`
+  "Players").
+- The radar counts as a per-frame feature (the snapshot is read every frame while it's on) and shows in the watermark.
+
+**Problems and fixes**
+- First screenshot attempt showed no overlay: `Start-Process -WindowStyle Minimized` gave the tool's console the
+  foreground, so the overlay hid itself (correct behaviour). Running it with `-NoNewWindow` keeps CS2 in front.
+- `python -I` hides the user site-packages, so Pillow wasn't found for the screenshot; inline one-liners run without
+  `-I`.
+
+**Verified here:** Debug and Release build with zero warnings; tests 138/138 in both (+13: radar maths, layout,
+filters, colours, edge clamping, facing, settings defaults, eye angles read); `--diag` all 50 checks OK. A screenshot
+over the live game (de_mirage, 1920x1080, radar temporarily on by default, then reverted) showed the radar in the
+top-right with every player, your arrow up, facing lines, faded edge dots and "40 m"; the 3 "visible" enemies matched
+the 3 red dots on the game's own radar, and the bot in the doorway ahead sat just above your arrow facing you.
+**Not verified (needs the user in-game):** the Misc page controls, rotation off, other corners and sizes, moving
+around (dots tracking smoothly), teams vs free-for-all.
+**User check (2026-10-07):** all good in-game; approved for commit.

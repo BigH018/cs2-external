@@ -126,7 +126,7 @@ fields of the 469 live client classes with the dump: 0 mismatches.
 | | `m_bIsScoped` | `0x1EA0` | ESP scoped indicator, triggerbot "only when scoped" |
 | | `m_iShotsFired` | `0x1EB4` | triggerbot burst counting |
 | | `m_ArmorValue` | `0x1ECC` | ESP |
-| | `m_angEyeAngles` | `0x35F0` | aimbot |
+| | `m_angEyeAngles` | `0x35F0` | aimbot; radar facing lines (every player's yaw, Phase 6) |
 | | `m_iIDEntIndex` | `0x36CC` | triggerbot (entity under the crosshair = the pawn's entity index, proven 2026-10-07) |
 | `EntitySpottedState_t` | `m_bSpotted` / `m_bSpottedByMask` | `0x8` / `0xC` | visibility heuristic (bit per player slot) |
 | `CBasePlayerController` | `m_hPawn` / `m_iszPlayerName` | `0x6BC` / `0x6FC` | name |
@@ -184,9 +184,15 @@ script, then `cs2_external.exe --live`):
 
 Controller: `m_iTeamNum` (uint8: 2 = T, 3 = CT), `m_iszPlayerName` (char[128], inline), `m_hPlayerPawn` (handle),
 `m_bPawnIsAlive`. Pawn: `m_iHealth`, `m_lifeState` (0 = alive), `m_pGameSceneNode` → `m_vecAbsOrigin`,
-`m_bDormant`, `m_vecViewOffset`, `m_ArmorValue`, `m_fFlags`, `m_bIsScoped`; weapon via the chain below. All schema
+`m_bDormant`, `m_vecViewOffset`, `m_ArmorValue`, `m_fFlags`, `m_bIsScoped`, `m_angEyeAngles` (Phase 6, the radar);
+weapon via the chain below. All schema
 fields from Phase 2 (`schema.h`); read live 2026-10-06 and matching what the game shows (names, teams, AK-47 / Glock-18
 / P2000 with ids 7 / 4 / 32).
+
+**`m_angEyeAngles` on every pawn (Phase 6, 2026-10-07, build 14189, de_mirage, read-only script):** the local pawn's
+value equals `dwViewAngles` (pitch 0.1267, yaw −42.0684 both, to the float's last digits); all 19 bots read pitch within
+±18° and yaw within ±180°, and the yaws move by 0.1-10° over one second as the frozen bots look around. Used only for
+the radar's facing lines (yaw); no new offset, the field was already in `schema.h` and checked by `--diag`.
 
 ## CGlobalVars (`offsets::layout::kGlobals*`, code: `game/globals`)
 

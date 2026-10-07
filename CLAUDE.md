@@ -306,8 +306,8 @@ cs2-external/
         schema_system.h/.cpp      ✅ PURE: find_type_scope (SchemaSystem_001), index_classes (self-pointing class
                                      infos in a client.dll copy), read_class (live fields)
         signatures.h/.cpp         ✅ PURE: resolve_signature over a module copy (several hits must agree)
-        snapshot.h                ✅ PURE data: Team, PlayerSnapshot (controller + pawn copy, pawn_index, eye_position,
-                                     head_position, on_ground), LocalState (crosshair entity, flash, view angles),
+        snapshot.h                ✅ PURE data: Team, PlayerSnapshot (controller + pawn copy, pawn_index, eye_angles,
+                                     eye_position, head_position, on_ground), LocalState (crosshair entity, flash, view angles),
                                      GameSnapshot (globals, view matrix if sane, players, local())
         player.h/.cpp             ✅ read_local_pawn; read_player (controller → pawn, validity checks: garbage pawn
                                      dropped); read_game (entity system, globals, view, every controller)
@@ -339,8 +339,11 @@ cs2-external/
         triggerbot.h/.cpp         ✅ trigger_target, trigger_block (reasons), Triggerbot state machine
         activation.h              ✅ KeyActivation: hold / toggle from a polled key (until Phase 7)
         feature_summary.h/.cpp    ✅ ActiveFeatures + feature_summary() → "ESP · Aimbot" for the watermark
+        radar.h/.cpp              ✅ radar_panel (corner), radar_offset / radar_direction (world → radar, rotated or
+                                     north-up), clamp_to_square, build_radar → primitives (dots, facing, names, edge)
       render/
-        primitives.h              ✅ Line, Rect, FilledRect, Circle, Text (+ TextAnchor), Primitive variant (PURE)
+        primitives.h              ✅ Line, Rect, FilledRect, Circle, FilledCircle, FilledTriangle, Text (+ TextAnchor),
+                                     Primitive variant (PURE)
         painter.h/.cpp            ✅ paint(draw list, primitives, font, size): ImGui, text with a shadow
       input/
         keys.h                    ✅ kBindableKeys (the keys Phase 5 features can use), key_name, key_index
@@ -350,7 +353,7 @@ cs2-external/
         key_poll.h/.cpp           🔲 [7] GetAsyncKeyState polling
         bind_capture.h/.cpp       🔲 [7] bind capture
       settings/
-        settings.h                ✅ Settings { overlay, general (team mode), esp, aimbot, triggerbot } + enums
+        settings.h                ✅ Settings { overlay, general (team mode), esp, aimbot, triggerbot, radar } + enums
         profile_json.h/.cpp       🔲 [8]
         profile_store.h/.cpp      🔲 [8]
         presets.h/.cpp            🔲 [8]
@@ -367,7 +370,8 @@ cs2-external/
         hud.h/.cpp                ✅ watermark (logo + active features) + frame outline, background draw list
         pages/                    ✅ pages.h + one file per page: home (logo, live status, map/players/you), esp (every
                                      ESP option, colour pickers), aimbot and triggerbot (every option + live status),
-                                     settings (overlay switches), misc (placeholder); controls.h/.cpp: shared check,
+                                     settings (overlay switches), misc (radar + radar colours; bomb timer, spectators,
+                                     hitsound still listed as coming); controls.h/.cpp: shared check,
                                      colour, combo, key_combo, team_mode_combo, max_distance_slider
       color.h                     ✅ Color (RGBA floats): rgb(0xRRGGBB), faded, lerp
       config.h                    ✅ PURE: branding, pointer bounds, page size, process/module names, --diag flag and
@@ -416,7 +420,10 @@ cs2-external/
     game/test_writes.cpp          ✅ button values, view angle read/normalized write (FakeMemory)
     helpers/fake_game.h           ✅ hand-built snapshots (you at the origin looking along +x)
     features/test_feature_summary.cpp ✅ the watermark's feature line (empty, one, order, all)
-    settings/test_settings.cpp    ✅ defaults inside their ranges (ESP, aimbot, triggerbot), bindable keys, config::Range
+    features/test_radar.cpp       ✅ corners, world → radar (rotated / north-up), directions, edge clamping, filters,
+                                     colours, facing lines, names
+    settings/test_settings.cpp    ✅ defaults inside their ranges (ESP, aimbot, triggerbot, radar), bindable keys,
+                                     config::Range
     settings/test_profile_json.cpp 🔲 [8]
     settings/test_profile_store.cpp 🔲 [8]
     settings/test_presets.cpp     🔲 [8]
@@ -727,6 +734,13 @@ Rules:
   yourself, and lets go when the menu opens, the game loses focus or the tool exits. Neither acts while the menu is
   open or the game isn't in front. Team mode is shared by every feature. The overlay's handle is now read-write;
   `--diag` / `--live` stay read-only. `--diag`: 50 checks.
+- **Phase 6, radar (done, verified in-game by the user 2026-10-07):** menu → Misc → Radar → Enabled (off by
+  default). Our own radar, drawn by the overlay (the game's radar isn't touched, nothing is written): a see-through
+  square in a corner (top-right by default; size 150-600 px, range 10-150 m), you as an arrow in the middle, every
+  live player as a dot (enemies visible / hidden from the spotted-by mask, teammates in teams mode if wanted), a
+  facing line per dot (`m_angEyeAngles`), optional names, out-of-range players faded on the edge (or hidden), a cross,
+  a half-range ring and the range in metres. Rotate with view (where you look is up) or north-up like the game's
+  radar. Its own colours, each with opacity. The watermark lists "Radar".
 
 ---
 
@@ -830,7 +844,10 @@ Rules:
 - **Projection: reject w < 0.01, not w < 0.** A point near the camera plane divides by almost nothing. A transposed
   (column-major) read of the matrix doesn't fail loudly: points collapse towards the centre (unit test guards it).
 - **Screenshots work for checking the overlay.** `PIL.ImageGrab.grab()` captures the game and the layered overlay
-  together (borderless 1920x1080), which is how Phase 4 was checked without the user.
+  together (borderless 1920x1080), which is how Phase 4 was checked without the user. Start the tool with
+  `Start-Process ... -NoNewWindow -RedirectStandardOutput <log>`: a new (even minimised) console window takes the
+  foreground and the overlay correctly hides. Only screenshot while CS2 is already in front (never steal the user's
+  focus). `python -I` hides the user site-packages where Pillow lives.
 - **A pawn's designer name isn't `cs_player_pawn`.** In build 14189 a bot's pawn identity reads
   `c_cs_player_for_precache`. Find pawns through the controller's `m_hPlayerPawn`, never by designer name.
 - **Read bools as bytes.** `read<bool>` of a byte that isn't 0/1 is undefined behaviour in C++; `game/player` reads
@@ -1087,9 +1104,13 @@ laggier than an internal one. That's the cost of external. It's still usable for
 ### Phase 6: Misc: radar, bomb timer, spectators, hitsound
 (Replaces the dropped "Player values" phase: no Player page, no health / armour / ammo writes, no Set / Freeze.
 Bunny hop was dropped from this phase by the user on 2026-10-07.)
-- [ ] Misc page: radar, bomb timer, spectator list, hitsound
-- [ ] Radar, bomb timer (`dwPlantedC4`), spectator list (observer handles), hitsound (overlay audio): one at a time,
-      each with its own in-game check
+One feature at a time, each with its own in-game check by the user (and its own commit after approval):
+- [x] **Radar** (`features/radar`, Misc page cards, `PlayerSnapshot::eye_angles`): built 2026-10-07, tests 138/138,
+      screenshot over the live game OK. Verified in-game by the user (2026-10-07): all good, approved
+- [ ] **Bomb timer** (`dwPlantedC4` or the `planted_c4` entity; needs a defuse map, not Deathmatch, to test)
+- [ ] **Spectator list** (observer pawn → observer services → target handle; dead players watching you)
+- [ ] **Hitsound** (overlay audio; hit detection to be found, e.g. a hits / damage counter on the local player)
+- [ ] Misc page: every feature above with its options (radar done)
 - [ ] Builds with zero warnings (Debug + Release); tests pass
 - [ ] Verified in-game by the user
 
@@ -1242,7 +1263,11 @@ against the map's collision geometry, read from the game files (not from game me
 
 - **Option 3 (own ray cast visibility) deferred** to a "Later" roadmap section, to come back to after the main phases.
 
-**Next:** Phase 6 (misc: radar, bomb timer, spectator list, hitsound; one at a time), in a new session.
+- **Phase 6, radar: done, verified in-game by the user (2026-10-07), committed and pushed.** Debug + Release zero
+  warnings, tests 138/138, `--diag` 50/50. **No offset changed** (`m_angEyeAngles` was already in `schema.h`; now
+  read for every pawn, proven live).
+
+**Next:** Phase 6, bomb timer (then spectator list, then hitsound; one at a time, each checked by the user).
 
 ---
 
@@ -1399,6 +1424,13 @@ against the map's collision geometry, read from the game files (not from game me
 - **2026-10-07 (user decision):** **Bunny hop dropped.** The user was advised it's a poor fit for external (jump timing
   from outside the game feels bad). Removed from §3, the Phase 6 plan, the Misc page placeholder and
   `features::ActiveFeatures`. The `jump` button format stays documented (proven) in case it's ever wanted.
+- **2026-10-07 (Phase 6):** The **radar is our own overlay panel**, not the game's radar. "Enlarged radar" and
+  "enemy dots on radar" both come from it (size and range sliders; every player drawn). Forcing the game's radar
+  (writing `m_bSpotted` on every bot) was not done: it's a write every frame for something a read-only drawing does
+  as well. No map image underneath (that would mean parsing the map's overview from the game files); dots on a dark
+  square, rotated with your view by default.
+- **2026-10-07 (Phase 6):** Phase 6 runs **one feature per check**: build one, the user checks it in-game, commit,
+  then the next (as the roadmap says), even with autonomous mode off and several features left.
 - **2026-10-06 (Phase 3):** Weapons are named from the **item definition index** (table in `game/weapon.cpp`), not the
   designer name, because some weapons share a designer name (USP-S / P2000). Each also gets a `WeaponClass` for the
   Phase 5 triggerbot filter.
