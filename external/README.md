@@ -6,8 +6,18 @@ Never edit files in this folder. Upgrade by replacing them with a newer tagged r
 |---|---|---|---|---|---|
 | doctest | 2.5.3 | MIT (`doctest/LICENSE.txt`) | https://github.com/doctest/doctest, tag `v2.5.3` | `doctest/doctest.h` | `0b36ccafaed7f4802cdf1b1c322977489b1dd658` |
 | Dear ImGui | 1.92.9b | MIT (`imgui/LICENSE.txt`) | https://github.com/ocornut/imgui, tag `v1.92.9b` (commit `f1cc2ae`) | core + `backends/imgui_impl_win32.*` + `backends/imgui_impl_dx11.*` (15 files, listed below) | every file matches the tag's tree (below) |
+| nlohmann/json | 3.12.0 | MIT (`nlohmann/LICENSE.MIT`) | https://github.com/nlohmann/json, release `v3.12.0` (single-header asset `json.hpp`) | `nlohmann/nlohmann/json.hpp`, `nlohmann/LICENSE.MIT` | `json.hpp` `82d69f7c5d044c9887c96b90c97f5639083ecd14`, `LICENSE.MIT` `a1dacc8dbbd907c4b622ff1f08e279c27465dcbc` |
 
-Planned: nlohmann/json v3.12.0 (Phase 8, after approval).
+## nlohmann/json v3.12.0 (Phase 8)
+
+Approved by the user 2026-10-07. Copied from the AC project's vendored copy, then checked against upstream: the
+SHA-256 of `json.hpp` (`aaf127c04cb31c406e5b04a63f1ae89369fccde6d8fa7cdda1ed4f32dfc5de63`) equals the official
+`v3.12.0` release asset (`gh release download v3.12.0 -R nlohmann/json -p json.hpp`), and `LICENSE.MIT`'s blob hash
+equals the one in the `v3.12.0` tag (`gh api repos/nlohmann/json/contents/LICENSE.MIT?ref=v3.12.0`).
+
+- Header-only, used only by `src/external/settings/profile_json.cpp`. `external.vcxproj` and `tests.vcxproj` put
+  `external/nlohmann` on their *external* include path (warnings off) and include `<nlohmann/json.hpp>`. Not part of
+  `vendor.vcxproj` (nothing to compile).
 
 ## Dear ImGui v1.92.9b (Phase 1)
 
