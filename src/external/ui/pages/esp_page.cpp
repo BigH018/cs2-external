@@ -12,95 +12,90 @@ namespace ui::pages
 {
 namespace
 {
-void draw_general(PageContext& ctx, settings::EspSettings& esp)
+void draw_main(PageContext& ctx, settings::EspSettings& esp)
 {
-    widgets::card_begin(ctx.fonts, "ESP");
-    check("Enabled", &esp.enabled,
-          "Draws boxes and labels over the bots, through walls. Everything below applies live.");
+    widgets::panel_begin(ctx.fonts, "ESP", &esp.enabled,
+                         "Draws boxes and labels over the bots, through walls. Everything here applies live.");
     keybind::bind_row(ctx.app, input::ActionId::esp_enable, "On / off key");
     settings::TeamMode& team_mode = ctx.app.settings.general.team_mode;
-    team_mode_combo(team_mode);
+    team_mode_row(team_mode);
     if (team_mode == settings::TeamMode::teams)
     {
-        check("Show teammates", &esp.show_teammates, "Draw your own team too, in the team colours.");
+        widgets::switch_row("Show teammates", &esp.show_teammates, "Draw your own team too, in the team colours.");
     }
-    max_distance_slider(esp.max_distance, "Players further away than this aren't drawn. All the way left = no limit.");
-    widgets::card_end();
+    max_distance_row(esp.max_distance, "Players further away than this aren't drawn. All the way left = no limit.");
+    widgets::panel_end();
 }
 
 void draw_shapes(PageContext& ctx, settings::EspSettings& esp)
 {
-    widgets::card_begin(ctx.fonts, "Shapes");
-    check("Box", &esp.box, "A box from the feet to just above the head.");
+    widgets::panel_begin(ctx.fonts, "Shapes");
+    widgets::switch_row("Box", &esp.box, "A box from the feet to just above the head.");
     if (esp.box)
     {
         static constexpr const char* kStyles[] = {"Full", "Corners"};
-        ImGui::SameLine(0.0f, scaled(24.0f));
-        ImGui::SetNextItemWidth(scaled(140.0f));
-        combo("Style", esp.box_style, kStyles, 2);
+        choice("Box style", esp.box_style, kStyles);
     }
-    check("Outline", &esp.outline, "A dark edge around boxes, so they stand out on bright walls.");
-    check("Head circle", &esp.head_circle,
-          "A circle around the head (the middle of the head from the bones, or the eyes if bones can't be read).");
-    check("Skeleton", &esp.skeleton, "Lines along the spine, arms and legs, from the bone positions.");
-    check("Snaplines", &esp.snaplines, "A line from the edge or centre of the screen to each player.");
+    widgets::switch_row("Outline", &esp.outline, "A dark edge around boxes, so they stand out on bright walls.");
+    widgets::switch_row("Head circle", &esp.head_circle,
+                        "A circle around the head (the middle of the head from the bones, or the eyes if bones can't "
+                        "be read).");
+    widgets::switch_row("Skeleton", &esp.skeleton, "Lines along the spine, arms and legs, from the bone positions.");
+    widgets::switch_row("Snaplines", &esp.snaplines, "A line from the edge or centre of the screen to each player.");
     if (esp.snaplines)
     {
         static constexpr const char* kOrigins[] = {"Bottom", "Centre", "Top"};
-        ImGui::SameLine(0.0f, scaled(24.0f));
-        ImGui::SetNextItemWidth(scaled(140.0f));
-        combo("From", esp.snapline_origin, kOrigins, 3);
+        choice("Snaplines from", esp.snapline_origin, kOrigins);
     }
-    ImGui::SetNextItemWidth(scaled(240.0f));
-    ImGui::SliderFloat("Thickness", &esp.thickness, config::kEspThickness.min, config::kEspThickness.max, "%.1f px",
-                       ImGuiSliderFlags_AlwaysClamp);
-    widgets::card_end();
+    widgets::slider_row("Thickness", &esp.thickness, config::kEspThickness.min, config::kEspThickness.max, "%.1f px");
+    widgets::panel_end();
 }
 
 void draw_labels(PageContext& ctx, settings::EspSettings& esp)
 {
-    widgets::card_begin(ctx.fonts, "Labels");
-    check("Name", &esp.name, "The player's name above the box.");
-    check("Health bar", &esp.health_bar, "A bar left of the box: green when healthy, red when nearly dead.");
-    check("Health number", &esp.health_number, "The health as a number beside the bar.");
-    check("Weapon", &esp.weapon, "The weapon in the player's hands, under the box.");
-    check("Distance", &esp.distance, "How far away the player is, in metres.");
-    check("Scoped indicator", &esp.scoped_indicator,
-          "\"SCOPED\" above the name while the player is zoomed in (AWP, SSG 08, SCAR-20, G3SG1, AUG, SG 553).");
-    widgets::card_end();
+    widgets::panel_begin(ctx.fonts, "Labels");
+    widgets::switch_row("Name", &esp.name, "The player's name above the box.");
+    widgets::switch_row("Health bar", &esp.health_bar, "A bar left of the box: green when healthy, red when nearly dead.");
+    widgets::switch_row("Health number", &esp.health_number, "The health as a number beside the bar.");
+    widgets::switch_row("Weapon", &esp.weapon, "The weapon in the player's hands, under the box.");
+    widgets::switch_row("Distance", &esp.distance, "How far away the player is, in metres.");
+    widgets::switch_row("Scoped tag", &esp.scoped_indicator,
+                        "\"SCOPED\" above the name while the player is zoomed in (AWP, SSG 08, SCAR-20, G3SG1, AUG, "
+                        "SG 553).");
+    widgets::panel_end();
 }
 
 void draw_colours(PageContext& ctx, settings::EspSettings& esp)
 {
     settings::EspColours& colours = esp.colours;
-    widgets::card_begin(ctx.fonts, "Colours");
-    check("Visible / hidden colours", &esp.visibility_colours,
-          "Uses the game's own \"spotted\" flag (the one that puts players on the radar): visible while you have line "
-          "of sight, hidden otherwise. It lags a little behind what you see. Off: always the visible colour.");
-    colour("Enemy, visible", colours.enemy_visible);
-    ImGui::SameLine(scaled(220.0f));
-    colour("Enemy, hidden", colours.enemy_hidden);
-    colour("Team, visible", colours.team_visible);
-    ImGui::SameLine(scaled(220.0f));
-    colour("Team, hidden", colours.team_hidden);
-    colour("Text", colours.text);
-    ImGui::SameLine(scaled(220.0f));
-    colour("Skeleton", colours.skeleton);
-    colour("Scoped tag", colours.scoped);
-    if (ImGui::Button("Reset colours"))
+    widgets::panel_begin(ctx.fonts, "Colours");
+    widgets::switch_row("Visible / hidden colours", &esp.visibility_colours,
+                        "Uses the game's own \"spotted\" flag (the one that puts players on the radar): visible while "
+                        "you have line of sight, hidden otherwise. It lags a little behind what you see. Off: always "
+                        "the visible colour.");
+    widgets::colour_row("Enemy, visible", colours.enemy_visible);
+    widgets::colour_row("Enemy, hidden", colours.enemy_hidden);
+    widgets::colour_row("Team, visible", colours.team_visible);
+    widgets::colour_row("Team, hidden", colours.team_hidden);
+    widgets::colour_row("Text", colours.text);
+    widgets::colour_row("Skeleton", colours.skeleton);
+    widgets::colour_row("Scoped tag", colours.scoped);
+    if (widgets::button("Reset colours"))
     {
         colours = settings::EspColours{};
     }
-    widgets::card_end();
+    widgets::panel_end();
 }
 } // namespace
 
 void draw_esp(PageContext& ctx)
 {
-    widgets::page_header(ctx.fonts, "ESP", "Draws boxes and labels over the bots, through walls.");
+    widgets::page_intro("Draws boxes and labels over the bots, through walls.");
     settings::EspSettings& esp = ctx.app.settings.esp;
-    draw_general(ctx, esp);
+    widgets::Columns columns;
+    draw_main(ctx, esp);
     draw_shapes(ctx, esp);
+    columns.next();
     draw_labels(ctx, esp);
     draw_colours(ctx, esp);
 }

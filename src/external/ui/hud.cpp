@@ -25,6 +25,7 @@ constexpr float kWatermarkGap = 6.0f;       // between the logo and the text
 constexpr float kFeatureLineGap = 2.0f;     // between feature lines
 constexpr float kFeatureDotRadius = 2.5f;   // the accent dot before each feature
 constexpr float kFeatureDotGap = 7.0f;      // from the dot's centre to the feature name
+constexpr float kWatermarkAlpha = 0.88f;    // the background, over the game
 constexpr char kNoFeatures[] = "No features on";
 
 ImVec2 text_size(ImFont* font, float size, const char* text)
@@ -74,9 +75,11 @@ void draw_watermark(const Fonts& fonts, ImTextureData* logo, ImDrawList* draw, c
     const float height = 2.0f * padding.y + title_height +
                          static_cast<float>(lines.size()) * (line_gap + line_height);
 
+    const Palette& p = palette();
     const ImVec2 min(scaled(config::kWatermarkMargin), scaled(config::kWatermarkMargin));
     const ImVec2 max(min.x + text_x + text_width + padding.x, min.y + height);
-    draw->AddRectFilled(min, max, ImGui::GetColorU32(theme::kWatermarkBg), scaled(kWatermarkRounding));
+    draw->AddRectFilled(min, max, u32(with_alpha(p.chrome, kWatermarkAlpha)), scaled(kWatermarkRounding));
+    draw->AddRect(min, max, u32(p.border), scaled(kWatermarkRounding));
     if (logo != nullptr)
     {
         const ImVec2 logo_min(min.x + inset, min.y + inset);
@@ -88,20 +91,19 @@ void draw_watermark(const Fonts& fonts, ImTextureData* logo, ImDrawList* draw, c
     // Title row.
     const float x = min.x + text_x;
     float y = min.y + padding.y;
-    draw->AddText(fonts.bold, font_size, ImVec2(x, y), ImGui::GetColorU32(theme::kText), config::kAppName);
-    draw->AddText(fonts.regular, font_size, ImVec2(x + name_size.x, y), ImGui::GetColorU32(theme::kLavender),
-                  author.c_str());
+    draw->AddText(fonts.bold, font_size, ImVec2(x, y), u32(p.text), config::kAppName);
+    draw->AddText(fonts.regular, font_size, ImVec2(x + name_size.x, y), u32(p.text_dim), author.c_str());
     y += title_height;
 
     // Feature lines.
-    const ImU32 line_colour = ImGui::GetColorU32(none ? theme::kTextDim : theme::kAccent);
+    const ImU32 line_colour = u32(none ? p.text_faint : p.text);
     for (const std::string& line : lines)
     {
         y += line_gap;
         if (!none)
         {
             draw->AddCircleFilled(ImVec2(x + scaled(kFeatureDotRadius), y + line_height * 0.5f),
-                                  scaled(kFeatureDotRadius), line_colour);
+                                  scaled(kFeatureDotRadius), u32(p.accent));
         }
         draw->AddText(fonts.regular, font_size, ImVec2(x + bullet, y), line_colour, line.c_str());
         y += line_height;
@@ -114,7 +116,7 @@ void draw_frame_outline(ImDrawList* draw)
     // sits right on the edges of the game's picture.
     const ImVec2 display = ImGui::GetIO().DisplaySize;
     const float half = config::kFrameOutlineThickness * 0.5f;
-    draw->AddRect(ImVec2(half, half), ImVec2(display.x - half, display.y - half), ImGui::GetColorU32(theme::kAccent),
+    draw->AddRect(ImVec2(half, half), ImVec2(display.x - half, display.y - half), u32(palette().accent),
                   0.0f, config::kFrameOutlineThickness);
 }
 } // namespace

@@ -100,7 +100,9 @@
     <ClCompile Include="settings\presets.cpp" />
     <ClCompile Include="settings\profile_json.cpp" />
     <ClCompile Include="settings\profile_store.cpp" />
+    <ClCompile Include="settings\themes.cpp" />
     <ClCompile Include="ui\hud.cpp" />
+    <ClCompile Include="ui\icons.cpp" />
     <ClCompile Include="ui\imgui_layer.cpp" />
     <ClCompile Include="ui\keybind_widgets.cpp" />
     <ClCompile Include="ui\menu.cpp" />
@@ -169,7 +171,9 @@
     <ClInclude Include="render\painter.h" />
     <ClInclude Include="render\primitives.h" />
     <ClInclude Include="settings\settings.h" />
+    <ClInclude Include="settings\themes.h" />
     <ClInclude Include="ui\hud.h" />
+    <ClInclude Include="ui\icons.h" />
     <ClInclude Include="ui\imgui_layer.h" />
     <ClInclude Include="ui\keybind_widgets.h" />
     <ClInclude Include="ui\logo_pixels.h" />

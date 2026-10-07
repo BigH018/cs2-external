@@ -72,7 +72,8 @@ struct Requests
 {
     std::optional<ProfileRequest> profile;
     std::optional<settings::Preset> preset;
-    bool exit = false; // the Exit button (Settings page): shut down like the exit key
+    bool exit = false;       // the Exit button (Settings page): shut down like the exit key
+    bool close_menu = false; // the menu's close button: like pressing the menu key
 };
 
 struct AppState

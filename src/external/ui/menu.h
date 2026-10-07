@@ -1,6 +1,7 @@
 #pragma once
 
-// The menu window: a header (title, author, status pills), a grouped sidebar and the current page. Drawn only while
+// The menu window (Phase 10 design): a header (logo, name, the edition pill, a close button), a row of tabs with icons
+// (a dot on the tabs whose feature is on) and the current page, laid out in two columns of panels. Drawn only while
 // the menu is open. The menu never touches game memory: it edits app::AppState and app/frame applies it.
 
 #include <array>

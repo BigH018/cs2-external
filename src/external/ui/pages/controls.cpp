@@ -1,45 +1,20 @@
 #include "ui/pages/controls.h"
 
 #include "config.h"
-#include "ui/theme.h"
-#include "ui/widgets.h"
 
 namespace ui::pages
 {
-static_assert(sizeof(Color) == 4 * sizeof(float), "ImGui edits a Color as float[4]");
-
-bool check(const char* label, bool* value, const char* help)
-{
-    const bool changed = ImGui::Checkbox(label, value);
-    ImGui::SameLine();
-    widgets::help_marker(help);
-    return changed;
-}
-
-bool colour(const char* label, Color& value)
-{
-    return ImGui::ColorEdit4(label, &value.r, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_NoInputs);
-}
-
-bool team_mode_combo(settings::TeamMode& mode)
+bool team_mode_row(settings::TeamMode& mode)
 {
     static constexpr const char* kTeamModes[] = {"Teams", "Free for all"};
-    ImGui::SetNextItemWidth(scaled(180.0f));
-    const bool changed = combo("Team mode", mode, kTeamModes, 2);
-    ImGui::SameLine();
-    widgets::help_marker("Who counts as an enemy, for every feature (ESP, aimbot, triggerbot, radar). Teams: the "
-                         "other team. Free for all: everyone else (CS2 deathmatch is free for all).");
-    return changed;
+    return choice("Team mode", mode, kTeamModes,
+                  "Who counts as an enemy, for every feature (ESP, aimbot, triggerbot, radar). Teams: the other team. "
+                  "Free for all: everyone else (CS2 deathmatch is free for all).");
 }
 
-bool max_distance_slider(float& metres, const char* help)
+bool max_distance_row(float& metres, const char* help)
 {
-    ImGui::SetNextItemWidth(scaled(240.0f));
-    const bool changed =
-        ImGui::SliderFloat("Max distance", &metres, config::kMaxDistance.min, config::kMaxDistance.max,
-                           metres <= 0.0f ? "no limit" : "%.0f m", ImGuiSliderFlags_AlwaysClamp);
-    ImGui::SameLine();
-    widgets::help_marker(help);
-    return changed;
+    return widgets::slider_row("Max distance", &metres, config::kMaxDistance.min, config::kMaxDistance.max,
+                               metres <= 0.0f ? "no limit" : "%.0f m", help);
 }
 } // namespace ui::pages

@@ -1,5 +1,7 @@
 #include "ui/keybind_widgets.h"
 
+#include <algorithm>
+#include <array>
 #include <span>
 #include <string>
 
@@ -14,10 +16,7 @@ namespace ui::keybind
 {
 namespace
 {
-// Sizes at UI scale 1.0.
-constexpr float kKeyButtonWidth = 130.0f;
-constexpr float kModeWidth = 100.0f;
-constexpr float kRowLabelWidth = 130.0f;
+constexpr float kKeyMinFraction = 0.4f; // of the control column, when a mode selector sits next to the key
 
 constexpr char kCaptureText[] = "Press a key...";
 constexpr char kHelp[] = "Click, then press a key or mouse button (for Mouse 1, click outside the menu). Esc clears "
@@ -49,8 +48,9 @@ std::string conflicting_with(const app::AppState& app, input::ActionId id)
 }
 } // namespace
 
-void key_button(app::AppState& app, input::ActionId id)
+void key_button(app::AppState& app, input::ActionId id, float width)
 {
+    const Palette& p = palette();
     const input::Bind& bind = app.settings.keybinds.bind(id);
     const bool capturing = app.capture.capturing(id);
     const std::string others = capturing ? std::string() : conflicting_with(app, id);
@@ -60,23 +60,23 @@ void key_button(app::AppState& app, input::ActionId id)
     int colours = 0;
     if (capturing)
     {
-        ImGui::PushStyleColor(ImGuiCol_Button, theme::kAccentSoft);
-        ImGui::PushStyleColor(ImGuiCol_Text, theme::kAccent);
-        ImGui::PushStyleColor(ImGuiCol_Border, theme::kAccent);
+        ImGui::PushStyleColor(ImGuiCol_Button, p.accent);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, p.accent_hover);
+        ImGui::PushStyleColor(ImGuiCol_Text, p.on_accent);
         colours = 3;
     }
     else if (!others.empty())
     {
-        ImGui::PushStyleColor(ImGuiCol_Text, theme::kDanger);
-        ImGui::PushStyleColor(ImGuiCol_Border, theme::kDanger);
+        ImGui::PushStyleColor(ImGuiCol_Button, with_alpha(p.danger, 0.16f));
+        ImGui::PushStyleColor(ImGuiCol_Text, p.danger);
         colours = 2;
     }
     else if (bind.key == input::kUnbound)
     {
-        ImGui::PushStyleColor(ImGuiCol_Text, theme::kTextDim);
+        ImGui::PushStyleColor(ImGuiCol_Text, p.text_faint);
         colours = 1;
     }
-    if (ImGui::Button(label.c_str(), ImVec2(scaled(kKeyButtonWidth), 0.0f)))
+    if (ImGui::Button(label.c_str(), ImVec2(width, 0.0f)))
     {
         if (capturing)
         {
@@ -102,7 +102,7 @@ void key_button(app::AppState& app, input::ActionId id)
     ImGui::PopID();
 }
 
-void mode_selector(app::AppState& app, input::ActionId id)
+void mode_selector(app::AppState& app, input::ActionId id, float width)
 {
     const std::span<const input::BindMode> modes = input::allowed_modes(id);
     if (modes.size() < 2)
@@ -110,36 +110,47 @@ void mode_selector(app::AppState& app, input::ActionId id)
         return;
     }
     input::Bind& bind = app.settings.keybinds.bind(id);
-    ImGui::PushID(static_cast<int>(input::index_of(id)));
-    ImGui::SetNextItemWidth(scaled(kModeWidth));
-    const std::string current(input::mode_name(bind.mode));
-    if (ImGui::BeginCombo("##mode", current.c_str()))
+    std::array<const char*, 3> names{};
+    int index = 0;
+    const std::size_t count = std::min(modes.size(), names.size());
+    for (std::size_t i = 0; i < count; ++i)
     {
-        for (const input::BindMode mode : modes)
-        {
-            const std::string name(input::mode_name(mode));
-            if (ImGui::Selectable(name.c_str(), mode == bind.mode))
-            {
-                bind.mode = mode;
-            }
-        }
-        ImGui::EndCombo();
+        names[i] = input::mode_name(modes[i]).data(); // string literals: null-terminated
+        index = modes[i] == bind.mode ? static_cast<int>(i) : index;
+    }
+    ImGui::PushID(static_cast<int>(input::index_of(id)));
+    if (widgets::segmented("##mode", &index, std::span<const char* const>(names.data(), count), width))
+    {
+        bind.mode = modes[static_cast<std::size_t>(index)];
     }
     ImGui::PopID();
 }
 
-void bind_row(app::AppState& app, input::ActionId id, const char* label)
+void bind_row(app::AppState& app, input::ActionId id, const char* label, const char* help)
 {
-    ImGui::AlignTextToFramePadding();
-    ImGui::TextUnformatted(label);
-    ImGui::SameLine(scaled(kRowLabelWidth) + ImGui::GetStyle().WindowPadding.x);
-    key_button(app, id);
-    if (input::allowed_modes(id).size() > 1)
+    ImGui::PushID(label);
+    const float width = widgets::row(label, help);
+    const std::span<const input::BindMode> modes = input::allowed_modes(id);
+    if (modes.size() > 1)
     {
+        // The mode selector gets what its names need; the key button the rest (but never less than its share).
+        const float spacing = ImGui::GetStyle().ItemSpacing.x;
+        float widest = 0.0f; // segments are equally wide, so each needs room for the longest name
+        for (const input::BindMode mode : modes)
+        {
+            widest = std::max(widest, ImGui::CalcTextSize(input::mode_name(mode).data()).x);
+        }
+        const float mode_needed =
+            static_cast<float>(modes.size()) * (widest + 2.0f * ImGui::GetStyle().FramePadding.x);
+        const float key = std::max(width - spacing - mode_needed, (width - spacing) * kKeyMinFraction);
+        key_button(app, id, key);
         ImGui::SameLine();
-        mode_selector(app, id);
-        ImGui::SameLine();
-        widgets::help_marker("Hold: on while the key is down. Toggle: each press switches it on or off.");
+        mode_selector(app, id, width - spacing - key);
     }
+    else
+    {
+        key_button(app, id, width);
+    }
+    ImGui::PopID();
 }
 } // namespace ui::keybind

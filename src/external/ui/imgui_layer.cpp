@@ -68,7 +68,8 @@ bool ImGuiLayer::init(HWND window, ID3D11Device* device, ID3D11DeviceContext* co
     io.ConfigFlags |= kMenuClosedFlags; // the menu starts closed
 
     ImGuiStyle& style = ImGui::GetStyle();
-    apply_theme(style);
+    apply_style(style);
+    use_theme(settings::OverlaySettings{}); // the colours; app/frame switches to the profile's theme every frame
     style.FontSizeBase = config::kFontSize;
     load_fonts();
     create_logo();
@@ -97,6 +98,7 @@ void ImGuiLayer::load_fonts()
     ImGuiIO& io = ImGui::GetIO();
     const std::string dir = windows_fonts_dir();
     fonts_.regular = add_font_if_present(io, dir.empty() ? dir : dir + "segoeui.ttf");
+    fonts_.semibold = add_font_if_present(io, dir.empty() ? dir : dir + "seguisb.ttf");
     fonts_.bold = add_font_if_present(io, dir.empty() ? dir : dir + "segoeuib.ttf");
     if (fonts_.regular == nullptr)
     {
@@ -106,6 +108,10 @@ void ImGuiLayer::load_fonts()
     if (fonts_.bold == nullptr)
     {
         fonts_.bold = fonts_.regular;
+    }
+    if (fonts_.semibold == nullptr)
+    {
+        fonts_.semibold = fonts_.bold;
     }
     io.FontDefault = fonts_.regular;
 }

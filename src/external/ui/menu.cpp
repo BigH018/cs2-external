@@ -6,6 +6,7 @@
 #include <imgui.h>
 
 #include "config.h"
+#include "ui/icons.h"
 #include "ui/pages/pages.h"
 #include "ui/widgets.h"
 
@@ -17,127 +18,190 @@ struct PageEntry
 {
     Page page;
     const char* label;
-    const char* group; // printed above the first entry of each group (nullptr = no heading)
+    Icon icon;
     void (*draw)(pages::PageContext&);
 };
 
 constexpr std::array kPages = {
-    PageEntry{Page::Home, "Home", nullptr, &pages::draw_home},
-    PageEntry{Page::Aimbot, "Aimbot", "COMBAT", &pages::draw_aimbot},
-    PageEntry{Page::Triggerbot, "Triggerbot", nullptr, &pages::draw_triggerbot},
-    PageEntry{Page::Esp, "ESP", "VISUALS", &pages::draw_esp},
-    PageEntry{Page::Misc, "Misc", nullptr, &pages::draw_misc},
-    PageEntry{Page::Keybinds, "Keybinds", "SETUP", &pages::draw_keybinds},
-    PageEntry{Page::Settings, "Settings", nullptr, &pages::draw_settings},
+    PageEntry{Page::Home, "Home", Icon::home, &pages::draw_home},
+    PageEntry{Page::Aimbot, "Aimbot", Icon::aimbot, &pages::draw_aimbot},
+    PageEntry{Page::Triggerbot, "Triggerbot", Icon::triggerbot, &pages::draw_triggerbot},
+    PageEntry{Page::Esp, "ESP", Icon::esp, &pages::draw_esp},
+    PageEntry{Page::Misc, "Misc", Icon::misc, &pages::draw_misc},
+    PageEntry{Page::Keybinds, "Keybinds", Icon::keybinds, &pages::draw_keybinds},
+    PageEntry{Page::Settings, "Settings", Icon::settings, &pages::draw_settings},
 };
 
 // Sizes at UI scale 1.0.
-constexpr float kAreaPadding = 20.0f;
-constexpr float kNavItemHeight = 36.0f;
-constexpr float kNavIndent = 16.0f;
-constexpr float kNavAccentBar = 3.0f;
-constexpr float kGroupFontSize = config::kFontSize - 4.0f;
+constexpr float kEdge = 16.0f;         // left/right padding of the header, tabs and page
+constexpr float kTabPadding = 11.0f;   // inside a tab, left and right
+constexpr float kTabGap = 2.0f;        // between tabs
+constexpr float kTabIconSize = 15.0f;
+constexpr float kTabIconGap = 7.0f;
+constexpr float kTabUnderline = 2.0f;
+constexpr float kTabDotRadius = 2.5f;
+constexpr float kCloseSize = 26.0f;
 
-ImU32 colour(const ImVec4& c)
+// The tab's feature (or any of them, for Misc) is switched on.
+bool page_active(const app::AppState& app, Page page)
 {
-    return ImGui::GetColorU32(c);
+    const settings::Settings& s = app.settings;
+    switch (page)
+    {
+    case Page::Aimbot: return s.aimbot.enabled;
+    case Page::Triggerbot: return s.triggerbot.enabled;
+    case Page::Esp: return s.esp.enabled;
+    case Page::Misc: return s.radar.enabled || s.bomb_timer.enabled || s.spectators.enabled;
+    default: return false;
+    }
 }
 
-// The header and sidebar backgrounds are painted on the window itself, with the window's rounded corners, so nothing
-// square pokes out of the rounded window.
-void paint_backgrounds()
+// The header and tab bar share one background, painted on the window with its rounded top corners.
+void paint_chrome()
 {
+    const Palette& p = palette();
     ImDrawList* draw = ImGui::GetWindowDrawList();
     const ImVec2 pos = ImGui::GetWindowPos();
     const ImVec2 size = ImGui::GetWindowSize();
-    const float rounding = ImGui::GetStyle().WindowRounding;
-    const float header = scaled(config::kHeaderHeight);
-    draw->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + header), colour(theme::kSidebar), rounding,
+    const float bottom = pos.y + scaled(config::kHeaderHeight) + scaled(config::kTabBarHeight);
+    draw->AddRectFilled(pos, ImVec2(pos.x + size.x, bottom), u32(p.chrome), ImGui::GetStyle().WindowRounding,
                         ImDrawFlags_RoundCornersTop);
-    draw->AddRectFilled(ImVec2(pos.x, pos.y + header), ImVec2(pos.x + scaled(config::kSidebarWidth), pos.y + size.y),
-                        colour(theme::kSidebar), rounding, ImDrawFlags_RoundCornersBottomLeft);
-    draw->AddLine(ImVec2(pos.x, pos.y + header), ImVec2(pos.x + size.x, pos.y + header), colour(theme::kBorder));
+    draw->AddLine(ImVec2(pos.x, bottom), ImVec2(pos.x + size.x, bottom), u32(p.border));
 }
 
-void draw_header(const Fonts& fonts, ImTextureData* logo)
+// A "x" drawn in a square button. Returns true when clicked.
+bool close_button(ImVec2 min, float size)
 {
-    const float header = scaled(config::kHeaderHeight);
-    const float padding = scaled(kAreaPadding);
-    const float logo_size = scaled(config::kHeaderLogoSize);
-    const ImVec2 origin = ImGui::GetCursorPos();
-
-    // Logo, title, author.
-    ImGui::SetCursorPos(ImVec2(origin.x + padding * 0.6f, origin.y + (header - logo_size) * 0.5f));
-    widgets::image_rounded(logo, logo_size, logo_size * 0.25f);
-    ImGui::SameLine(0.0f, scaled(12.0f));
-    ImGui::PushFont(fonts.bold, scaled(config::kTitleFontSize));
-    const float title_height = ImGui::GetTextLineHeight();
-    ImGui::SetCursorPosY(origin.y + (header - title_height) * 0.5f);
-    ImGui::TextUnformatted(config::kAppName);
-    ImGui::PopFont();
-    const float small_y = origin.y + (header - title_height) * 0.5f + (title_height - ImGui::GetTextLineHeight()) * 0.8f;
-    ImGui::SameLine(0.0f, scaled(8.0f));
-    ImGui::SetCursorPosY(small_y);
-    ImGui::TextColored(theme::kLavender, "%s", config::kAppAuthor);
-
-    // The edition pill on the right.
-    const float pill_width = ImGui::CalcTextSize(config::kAppEdition).x + 2.0f * scaled(9.0f);
-    const float pill_y = origin.y + (header - (ImGui::GetTextLineHeight() + 2.0f * scaled(3.0f))) * 0.5f;
-    ImGui::SameLine();
-    ImGui::SetCursorPos(
-        ImVec2(std::max(ImGui::GetCursorPosX(), ImGui::GetWindowWidth() - pill_width - padding), pill_y));
-    widgets::pill(config::kAppEdition, theme::kAccent);
-
-    ImGui::SetCursorPos(ImVec2(origin.x, origin.y + header));
-}
-
-void draw_sidebar(MenuState& state)
-{
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(scaled(10.0f), scaled(12.0f)));
-    ImGui::BeginChild("##sidebar", ImVec2(scaled(config::kSidebarWidth), 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
+    const Palette& p = palette();
+    ImGui::SetCursorScreenPos(min);
+    const bool clicked = ImGui::InvisibleButton("##close", ImVec2(size, size));
+    const bool hovered = ImGui::IsItemHovered();
     ImDrawList* draw = ImGui::GetWindowDrawList();
+    const ImVec2 max(min.x + size, min.y + size);
+    if (hovered)
+    {
+        draw->AddRectFilled(min, max, u32(p.control_hover), ImGui::GetStyle().FrameRounding);
+        ImGui::SetTooltip("Close the menu (same as the menu key)");
+    }
+    const float arm = size * 0.2f;
+    const ImVec2 c(min.x + size * 0.5f, min.y + size * 0.5f);
+    const ImU32 colour = u32(hovered ? p.text : p.text_dim);
+    draw->AddLine(ImVec2(c.x - arm, c.y - arm), ImVec2(c.x + arm, c.y + arm), colour, 1.6f);
+    draw->AddLine(ImVec2(c.x - arm, c.y + arm), ImVec2(c.x + arm, c.y - arm), colour, 1.6f);
+    return clicked;
+}
+
+void draw_header(const Fonts& fonts, ImTextureData* logo, app::AppState& app)
+{
+    const Palette& p = palette();
+    const float header = scaled(config::kHeaderHeight);
+    const float edge = scaled(kEdge);
+    const float logo_size = scaled(config::kHeaderLogoSize);
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetWindowSize().x;
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+
+    // Logo, name, author.
+    ImGui::SetCursorScreenPos(ImVec2(origin.x + edge, origin.y + (header - logo_size) * 0.5f));
+    widgets::image_rounded(logo, logo_size, logo_size * 0.28f);
+    const float title_size = scaled(config::kTitleFontSize);
+    const ImVec2 name_size = fonts.bold->CalcTextSizeA(title_size, 1e6f, 0.0f, config::kAppName);
+    const float text_x = origin.x + edge + logo_size + scaled(12.0f);
+    const float text_y = origin.y + (header - name_size.y) * 0.5f;
+    draw->AddText(fonts.bold, title_size, ImVec2(text_x, text_y), u32(p.text), config::kAppName);
+    const float small = ImGui::GetFontSize();
+    const ImVec2 author_size = ImGui::CalcTextSize(config::kAppAuthor);
+    draw->AddText(fonts.regular, small,
+                  ImVec2(text_x + name_size.x + scaled(8.0f), text_y + name_size.y - author_size.y - scaled(1.0f)),
+                  u32(p.text_dim), config::kAppAuthor);
+
+    // Right side: the edition pill, then the close button.
+    const float close = scaled(kCloseSize);
+    const ImVec2 close_min(origin.x + width - edge - close, origin.y + (header - close) * 0.5f);
+    if (close_button(close_min, close))
+    {
+        app.requests.close_menu = true;
+    }
+    const ImVec2 pill_text = ImGui::CalcTextSize(config::kAppEdition);
+    const float pill_width = pill_text.x + 2.0f * scaled(8.0f);
+    const float pill_height = pill_text.y + 2.0f * scaled(2.0f);
+    ImGui::SetCursorScreenPos(
+        ImVec2(close_min.x - scaled(10.0f) - pill_width, origin.y + (header - pill_height) * 0.5f));
+    widgets::pill(config::kAppEdition, p.text_dim);
+
+    ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + header));
+}
+
+void draw_tabs(MenuState& state, const Fonts& fonts, const app::AppState& app)
+{
+    const Palette& p = palette();
+    const float height = scaled(config::kTabBarHeight);
+    const float padding = scaled(kTabPadding);
+    const float icon = scaled(kTabIconSize);
+    const float icon_gap = scaled(kTabIconGap);
+    const float gap = scaled(kTabGap);
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const float available = ImGui::GetWindowSize().x - 2.0f * scaled(kEdge);
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    ImGui::PushFont(fonts.semibold, 0.0f);
+
+    // Every tab with its label if they fit; otherwise only the selected one keeps its label (the rest show it as a
+    // tooltip).
+    float full = 0.0f;
     for (const PageEntry& entry : kPages)
     {
-        if (entry.group != nullptr)
-        {
-            ImGui::Dummy(ImVec2(0.0f, scaled(4.0f)));
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + scaled(6.0f));
-            ImGui::PushFont(nullptr, scaled(kGroupFontSize));
-            ImGui::TextColored(theme::kTextFaint, "%s", entry.group);
-            ImGui::PopFont();
-        }
+        full += 2.0f * padding + icon + icon_gap + ImGui::CalcTextSize(entry.label).x + gap;
+    }
+    const bool compact = full > available;
+
+    float x = origin.x + scaled(kEdge) - padding;
+    for (const PageEntry& entry : kPages)
+    {
         const bool selected = state.page == entry.page;
-        const ImVec2 min = ImGui::GetCursorScreenPos();
-        const ImVec2 size(ImGui::GetContentRegionAvail().x, scaled(kNavItemHeight));
+        const bool labelled = !compact || selected;
+        const ImVec2 label_size = ImGui::CalcTextSize(entry.label);
+        const float width = 2.0f * padding + icon + (labelled ? icon_gap + label_size.x : 0.0f);
+        ImGui::SetCursorScreenPos(ImVec2(x, origin.y));
         ImGui::PushID(static_cast<int>(entry.page));
-        if (ImGui::InvisibleButton("##nav", size))
+        if (ImGui::InvisibleButton("##tab", ImVec2(width, height)))
         {
             state.page = entry.page;
         }
         const bool hovered = ImGui::IsItemHovered();
         ImGui::PopID();
-        const ImVec2 max(min.x + size.x, min.y + size.y);
-        if (selected || hovered)
+        if (hovered && !labelled)
         {
-            draw->AddRectFilled(min, max, colour(selected ? theme::kAccentSoft : theme::kSurface), scaled(8.0f));
+            ImGui::SetTooltip("%s", entry.label);
+        }
+
+        const ImU32 colour = u32(selected ? p.text : (hovered ? p.text : p.text_dim));
+        const ImVec2 icon_centre(x + padding + icon * 0.5f, origin.y + height * 0.5f);
+        draw_icon(draw, entry.icon, icon_centre, icon, u32(selected ? p.accent : (hovered ? p.text : p.text_dim)));
+        if (page_active(app, entry.page))
+        {
+            draw->AddCircleFilled(ImVec2(icon_centre.x + icon * 0.55f, icon_centre.y - icon * 0.55f),
+                                  scaled(kTabDotRadius), u32(p.ok));
+        }
+        if (labelled)
+        {
+            draw->AddText(ImVec2(x + padding + icon + icon_gap, origin.y + (height - label_size.y) * 0.5f), colour,
+                          entry.label);
         }
         if (selected)
         {
-            draw->AddRectFilled(ImVec2(min.x, min.y + scaled(8.0f)),
-                                ImVec2(min.x + scaled(kNavAccentBar), max.y - scaled(8.0f)), colour(theme::kAccent),
-                                scaled(2.0f));
+            draw->AddRectFilled(ImVec2(x + padding * 0.5f, origin.y + height - scaled(kTabUnderline)),
+                                ImVec2(x + width - padding * 0.5f, origin.y + height), u32(p.accent),
+                                scaled(kTabUnderline));
         }
-        const ImU32 text = colour(selected ? theme::kAccent : (hovered ? theme::kText : theme::kTextDim));
-        const ImVec2 label_size = ImGui::CalcTextSize(entry.label);
-        draw->AddText(ImVec2(min.x + scaled(kNavIndent), min.y + (size.y - label_size.y) * 0.5f), text, entry.label);
+        x += width + gap;
     }
-    ImGui::EndChild();
-    ImGui::PopStyleVar();
+    ImGui::PopFont();
+    ImGui::SetCursorScreenPos(ImVec2(origin.x, origin.y + height));
 }
 
 void draw_page(MenuState& state, pages::PageContext& ctx)
 {
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(scaled(kAreaPadding), scaled(kAreaPadding) * 0.8f));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(scaled(kEdge), scaled(kEdge) * 0.8f));
     ImGui::BeginChild("##page", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
     for (const PageEntry& entry : kPages)
     {
@@ -167,10 +231,9 @@ void draw_menu(MenuState& state, const Fonts& fonts, ImTextureData* logo, app::A
                                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
     if (ImGui::Begin("External Cheat##menu", nullptr, kFlags))
     {
-        paint_backgrounds();
-        draw_header(fonts, logo);
-        draw_sidebar(state);
-        ImGui::SameLine(0.0f, 0.0f);
+        paint_chrome();
+        draw_header(fonts, logo, app);
+        draw_tabs(state, fonts, app);
         pages::PageContext ctx{fonts, app, logo, state};
         draw_page(state, ctx);
     }

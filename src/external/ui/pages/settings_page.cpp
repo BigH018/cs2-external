@@ -9,8 +9,8 @@
 #include "config.h"
 #include "input/actions.h"
 #include "input/keys.h"
-#include "settings/presets.h"
 #include "settings/profile_store.h"
+#include "settings/themes.h"
 #include "ui/pages/pages.h"
 #include "ui/widgets.h"
 
@@ -18,9 +18,10 @@ namespace ui::pages
 {
 namespace
 {
-constexpr float kProfileListHeight = 130.0f; // at UI scale 1.0
-constexpr float kNameInputWidth = 220.0f;
-constexpr float kPresetButtonWidth = 90.0f;
+// Sizes at UI scale 1.0.
+constexpr float kProfileListHeight = 140.0f;
+constexpr float kThemeTileHeight = 64.0f;
+constexpr float kThemeTileMinWidth = 92.0f;
 
 void request(app::AppState& app, app::ProfileOp op, std::string name = {})
 {
@@ -37,9 +38,10 @@ void draw_profile_list(PageContext& ctx)
     {
         menu.selected_profile = app.profiles.current;
     }
-    const ImVec2 size(std::min(scaled(kNameInputWidth * 1.6f), ImGui::GetContentRegionAvail().x),
-                      scaled(kProfileListHeight));
-    if (!ImGui::BeginListBox("##profiles", size))
+    ImGui::PushStyleColor(ImGuiCol_FrameBg, palette().window);
+    const bool open = ImGui::BeginListBox("##profiles", ImVec2(-1.0f, scaled(kProfileListHeight)));
+    ImGui::PopStyleColor();
+    if (!open)
     {
         return;
     }
@@ -66,92 +68,89 @@ void draw_profiles(PageContext& ctx)
     MenuState& menu = ctx.menu;
     const app::ProfileState& profiles = app.profiles;
     const bool current_read_only = settings::ProfileStore::is_read_only(profiles.current);
+    const Palette& p = palette();
 
-    widgets::card_begin(ctx.fonts, "Profiles");
-    widgets::hint("Every setting and keybind, saved as a JSON file. The last loaded or saved profile loads again on "
-                  "the next start. \"default\" is the built-in defaults and can't be overwritten: use Save as.");
+    widgets::panel_begin(ctx.fonts, "Profiles", nullptr,
+                         "Every setting and keybind (and this look), saved as a JSON file. The last loaded or saved "
+                         "profile loads again on the next start. \"default\" is the built-in defaults and can't be "
+                         "overwritten: use Save as.");
     widgets::info_row("Current profile", profiles.current.c_str());
     if (app.unsaved_changes())
     {
-        ImGui::SameLine();
-        ImGui::TextColored(theme::kWarn, "%s", "unsaved changes");
+        widgets::info_row("", "unsaved changes", p.warn);
     }
 
     draw_profile_list(ctx);
 
-    // The selected profile: load or delete.
-    if (ImGui::Button("Load"))
+    // The selected profile: load or delete. The current one: save.
+    if (widgets::button("Load", widgets::Tone::accent))
     {
         request(app, app::ProfileOp::load, menu.selected_profile);
     }
     ImGui::SameLine();
-    const bool can_delete = !settings::ProfileStore::is_read_only(menu.selected_profile);
-    ImGui::BeginDisabled(!can_delete);
-    if (can_delete && menu.confirm_delete == menu.selected_profile)
-    {
-        ImGui::PushStyleColor(ImGuiCol_Text, theme::kDanger);
-        if (ImGui::Button("Really delete?"))
-        {
-            request(app, app::ProfileOp::remove, menu.selected_profile);
-            menu.confirm_delete.clear();
-        }
-        ImGui::PopStyleColor();
-    }
-    else if (ImGui::Button("Delete"))
-    {
-        menu.confirm_delete = menu.selected_profile;
-    }
-    ImGui::EndDisabled();
-
-    // The current profile: save, or back to the defaults.
-    ImGui::SameLine();
     ImGui::BeginDisabled(current_read_only);
-    if (ImGui::Button("Save"))
+    if (widgets::button("Save"))
     {
         request(app, app::ProfileOp::save);
     }
     ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Reset to defaults"))
+    const bool can_delete = !settings::ProfileStore::is_read_only(menu.selected_profile);
+    ImGui::BeginDisabled(!can_delete);
+    if (can_delete && menu.confirm_delete == menu.selected_profile)
     {
-        request(app, app::ProfileOp::reset);
+        if (widgets::button("Really delete?", widgets::Tone::danger))
+        {
+            request(app, app::ProfileOp::remove, menu.selected_profile);
+            menu.confirm_delete.clear();
+        }
     }
-    ImGui::SameLine();
-    widgets::help_marker("Every setting and keybind back to the built-in defaults. Nothing is saved until you Save "
-                         "(or Save as).");
+    else if (widgets::button("Delete", widgets::Tone::danger))
+    {
+        menu.confirm_delete = menu.selected_profile;
+    }
+    ImGui::EndDisabled();
 
     // A name: save as a new profile, or rename the current one.
-    ImGui::SetNextItemWidth(std::min(scaled(kNameInputWidth), ImGui::GetContentRegionAvail().x));
-    ImGui::InputTextWithHint("##profile_name", "new profile name", menu.profile_name.data(), menu.profile_name.size());
+    widgets::subheading("NEW NAME");
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float save_as = ImGui::CalcTextSize("Save as").x + 2.0f * ImGui::GetStyle().FramePadding.x;
+    const float rename = ImGui::CalcTextSize("Rename").x + 2.0f * ImGui::GetStyle().FramePadding.x;
+    ImGui::SetNextItemWidth(std::max(ImGui::GetContentRegionAvail().x - save_as - rename - 2.0f * spacing, 60.0f));
+    ImGui::InputTextWithHint("##profile_name", "letters, digits, spaces, _ and -", menu.profile_name.data(),
+                             menu.profile_name.size());
     const std::string name(menu.profile_name.data());
     const bool valid_name = settings::ProfileStore::clean_name(name).has_value();
     ImGui::SameLine();
     ImGui::BeginDisabled(!valid_name);
-    if (ImGui::Button("Save as"))
+    if (widgets::button("Save as"))
     {
         request(app, app::ProfileOp::save_as, name);
         menu.profile_name.fill('\0');
     }
     ImGui::SameLine();
     ImGui::BeginDisabled(current_read_only);
-    if (ImGui::Button("Rename current"))
+    if (widgets::button("Rename"))
     {
         request(app, app::ProfileOp::rename, name);
         menu.profile_name.fill('\0');
     }
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+    {
+        ImGui::SetTooltip("Rename the current profile");
+    }
     ImGui::EndDisabled();
     ImGui::EndDisabled();
-    ImGui::SameLine();
-    widgets::help_marker("Names: letters, digits, spaces, _ and -, up to 40 characters.");
 
     if (!profiles.message.empty())
     {
-        widgets::notice(profiles.message.c_str(), profiles.message_failed);
+        widgets::notice(profiles.message.c_str(),
+                        profiles.message_failed ? widgets::Notice::warn : widgets::Notice::info);
     }
     if (!profiles.warnings.empty())
     {
         const std::string title = std::to_string(profiles.warnings.size()) + " problem(s) in the loaded profile";
-        ImGui::PushStyleColor(ImGuiCol_Text, theme::kWarn);
+        ImGui::PushStyleColor(ImGuiCol_Text, p.warn);
         const bool open = ImGui::TreeNode(title.c_str());
         ImGui::PopStyleColor();
         if (open)
@@ -163,53 +162,115 @@ void draw_profiles(PageContext& ctx)
             ImGui::TreePop();
         }
     }
-    ImGui::TextColored(theme::kTextFaint, "Folder: %s", profiles.folder.c_str());
-    widgets::card_end();
+    if (widgets::button("Reset to defaults"))
+    {
+        request(app, app::ProfileOp::reset);
+    }
+    ImGui::SameLine();
+    widgets::help_marker("Every setting and keybind back to the built-in defaults. Nothing is saved until you Save "
+                         "(or Save as).");
+    ImGui::PushStyleColor(ImGuiCol_Text, p.text_faint);
+    ImGui::TextWrapped("Folder: %s", profiles.folder.c_str());
+    ImGui::PopStyleColor();
+    widgets::panel_end();
 }
 
-void draw_presets(PageContext& ctx)
+// One clickable preview per theme: its background, a panel, a line of text, its accent and its name.
+bool theme_tile(settings::MenuTheme theme, bool selected, float width)
 {
-    widgets::card_begin(ctx.fonts, "Presets");
-    widgets::hint("A preset switches the features and sets their strength. Keybinds, colours, team mode, team checks, "
-                  "max distances and where things sit stay as they are. Save to keep the result. Keys: Keybinds page, "
-                  "Presets.");
-    for (const settings::Preset preset : settings::kPresets)
+    const settings::ThemeColours& t = settings::theme_colours(theme);
+    const Palette& p = palette();
+    const float height = scaled(kThemeTileHeight);
+    const float rounding = ImGui::GetStyle().FrameRounding;
+    const ImVec2 min = ImGui::GetCursorScreenPos();
+    ImGui::PushID(static_cast<int>(theme));
+    const bool clicked = ImGui::InvisibleButton("##theme", ImVec2(width, height));
+    const bool hovered = ImGui::IsItemHovered();
+    ImGui::PopID();
+    const ImVec2 max(min.x + width, min.y + height);
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    draw->AddRectFilled(min, max, u32(to_imvec4(t.window)), rounding);
+
+    // A tiny panel with a text line and an accent switch.
+    const float pad = scaled(7.0f);
+    const ImVec2 panel_min(min.x + pad, min.y + pad);
+    const ImVec2 panel_max(max.x - pad, min.y + height * 0.52f);
+    draw->AddRectFilled(panel_min, panel_max, u32(to_imvec4(t.panel)), rounding * 0.6f);
+    const float mid = (panel_min.y + panel_max.y) * 0.5f;
+    draw->AddLine(ImVec2(panel_min.x + pad * 0.8f, mid), ImVec2(panel_min.x + (panel_max.x - panel_min.x) * 0.45f, mid),
+                  u32(to_imvec4(t.text_dim)), scaled(2.0f));
+    const float knob = (panel_max.y - panel_min.y) * 0.22f;
+    const ImVec2 track_max(panel_max.x - pad * 0.8f, mid + knob);
+    const ImVec2 track_min(track_max.x - knob * 3.6f, mid - knob);
+    draw->AddRectFilled(track_min, track_max, u32(to_imvec4(t.accent)), knob);
+
+    const char* name = settings::theme_name(theme).data();
+    const ImVec2 name_size = ImGui::CalcTextSize(name);
+    draw->AddText(ImVec2(min.x + (width - name_size.x) * 0.5f, panel_max.y + (max.y - panel_max.y - name_size.y) * 0.5f),
+                  u32(to_imvec4(t.text)), name);
+
+    if (selected)
     {
-        const std::string label = std::string(settings::preset_name(preset)) + "##preset";
-        const bool rage = preset == settings::Preset::rage;
-        if (rage)
-        {
-            ImGui::PushStyleColor(ImGuiCol_Text, theme::kDanger);
-        }
-        if (ImGui::Button(label.c_str(), ImVec2(scaled(kPresetButtonWidth), 0.0f)))
-        {
-            ctx.app.requests.preset = preset;
-        }
-        if (rage)
-        {
-            ImGui::PopStyleColor();
-        }
-        ImGui::SameLine();
-        ImGui::AlignTextToFramePadding();
-        ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextColored(theme::kTextDim, "%s", settings::preset_description(preset).data());
-        ImGui::PopTextWrapPos();
+        draw->AddRect(min, max, u32(p.accent), rounding, scaled(2.0f));
     }
-    widgets::card_end();
+    else
+    {
+        draw->AddRect(min, max, u32(hovered ? p.text_dim : p.border), rounding);
+    }
+    return clicked;
+}
+
+void draw_appearance(PageContext& ctx)
+{
+    settings::OverlaySettings& overlay = ctx.app.settings.overlay;
+    widgets::panel_begin(ctx.fonts, "Appearance", nullptr,
+                         "The menu's and the watermark's colours. Saved in the profile. The ESP, radar and panels on "
+                         "the game keep their own colours (their tabs).");
+    widgets::subheading("THEME");
+    const float spacing = ImGui::GetStyle().ItemSpacing.x;
+    const float available = ImGui::GetContentRegionAvail().x;
+    const int count = static_cast<int>(settings::kMenuThemes.size());
+    const int per_row = std::clamp(static_cast<int>((available + spacing) / (scaled(kThemeTileMinWidth) + spacing)),
+                                   1, count);
+    const float width = (available - spacing * static_cast<float>(per_row - 1)) / static_cast<float>(per_row);
+    for (int i = 0; i < count; ++i)
+    {
+        if (i % per_row != 0)
+        {
+            ImGui::SameLine();
+        }
+        const settings::MenuTheme theme = settings::kMenuThemes[static_cast<std::size_t>(i)];
+        if (theme_tile(theme, theme == overlay.theme, width))
+        {
+            overlay.theme = theme;
+            overlay.accent = settings::theme_colours(theme).accent; // a new theme brings its own accent
+        }
+    }
+    widgets::subheading("ACCENT");
+    widgets::colour_row("Accent colour", overlay.accent, false,
+                        "Switches that are on, the selected tab, sliders and the main buttons. Picking a theme sets "
+                        "its own accent first.");
+    const Color theme_accent = settings::theme_colours(overlay.theme).accent;
+    ImGui::BeginDisabled(overlay.accent == theme_accent);
+    if (widgets::button("Use the theme's accent"))
+    {
+        overlay.accent = theme_accent;
+    }
+    ImGui::EndDisabled();
+    widgets::panel_end();
 }
 
 void draw_overlay(PageContext& ctx)
 {
-    widgets::card_begin(ctx.fonts, "Overlay");
-    ImGui::Checkbox("Watermark", &ctx.app.settings.overlay.watermark);
-    ImGui::SameLine();
-    widgets::help_marker("The logo and \"External Cheat by BigH\" in the top-left corner of the game, with the "
-                         "features that are on listed under it.");
-    ImGui::Checkbox("Frame outline", &ctx.app.settings.overlay.frame_outline);
-    ImGui::SameLine();
-    widgets::help_marker("A thin line along the overlay's edges. If the overlay covers the game exactly, the line sits "
-                         "right on the edges of the game's picture, in windowed mode too.");
-    widgets::card_end();
+    settings::OverlaySettings& overlay = ctx.app.settings.overlay;
+    widgets::panel_begin(ctx.fonts, "Overlay");
+    widgets::switch_row("Watermark", &overlay.watermark,
+                        "The logo and \"External Cheat by BigH\" in the top-left corner of the game, with the features "
+                        "that are on listed under it.");
+    widgets::switch_row("Frame outline", &overlay.frame_outline,
+                        "A thin line along the overlay's edges. If the overlay covers the game exactly, the line sits "
+                        "right on the edges of the game's picture, in windowed mode too.");
+    widgets::panel_end();
 }
 
 // Exit straight away, or after one more click if there are unsaved changes.
@@ -217,7 +278,7 @@ void draw_exit(PageContext& ctx)
 {
     app::AppState& app = ctx.app;
     MenuState& menu = ctx.menu;
-    widgets::card_begin(ctx.fonts, "Exit");
+    widgets::panel_begin(ctx.fonts, "Exit");
     widgets::hint(std::format("Closes the tool cleanly: lets go of anything it pressed in the game, removes the "
                               "overlay and closes the handle. The game keeps running, as if the tool was never "
                               "started. Same as the exit key ({}).",
@@ -228,40 +289,35 @@ void draw_exit(PageContext& ctx)
     {
         menu.confirm_exit = false;
     }
-    ImGui::PushStyleColor(ImGuiCol_Text, theme::kDanger);
     if (menu.confirm_exit)
     {
-        if (ImGui::Button("Really exit? Unsaved changes are lost"))
+        if (widgets::button("Really exit? Unsaved changes are lost", widgets::Tone::danger))
         {
             app.requests.exit = true;
         }
-        ImGui::PopStyleColor();
         ImGui::SameLine();
-        if (ImGui::Button("Cancel##exit"))
+        if (widgets::button("Cancel##exit"))
         {
             menu.confirm_exit = false;
         }
     }
-    else
+    else if (widgets::button("Exit the tool", widgets::Tone::danger))
     {
-        if (ImGui::Button("Exit the tool"))
-        {
-            app.requests.exit = !unsaved;
-            menu.confirm_exit = unsaved;
-        }
-        ImGui::PopStyleColor();
+        app.requests.exit = !unsaved;
+        menu.confirm_exit = unsaved;
     }
-    widgets::card_end();
+    widgets::panel_end();
 }
 } // namespace
 
 void draw_settings(PageContext& ctx)
 {
-    widgets::page_header(ctx.fonts, "Settings", "Profiles, presets and the overlay. Changes apply immediately.");
+    widgets::page_intro("Profiles, the menu's look and the overlay. Changes apply immediately.");
+    widgets::Columns columns;
     draw_profiles(ctx);
-    draw_presets(ctx);
+    columns.next();
+    draw_appearance(ctx);
     draw_overlay(ctx);
     draw_exit(ctx);
-    widgets::planned_card(ctx.fonts, "Phase 10", {"Menu size"});
 }
 } // namespace ui::pages

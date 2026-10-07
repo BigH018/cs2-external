@@ -8,13 +8,13 @@
 
 namespace ui::keybind
 {
-// The bound key. Click: "Press a key..." (the next key or mouse button becomes the bind, Esc clears it, clicking again
-// cancels). Red with a tooltip when the same key is bound to other actions.
-void key_button(app::AppState& app, input::ActionId id);
+// The bound key, `width` wide. Click: "Press a key..." (the next key or mouse button becomes the bind, Esc clears it,
+// clicking again cancels). Red with a tooltip when the same key is bound to other actions.
+void key_button(app::AppState& app, input::ActionId id, float width);
 
-// Hold / Toggle for actions that allow both (nothing for press-only actions).
-void mode_selector(app::AppState& app, input::ActionId id);
+// Hold | Toggle as segmented buttons, for actions that allow both (nothing for press-only actions).
+void mode_selector(app::AppState& app, input::ActionId id, float width);
 
-// "Label    [key] [Hold v]" on one line, for the feature pages.
-void bind_row(app::AppState& app, input::ActionId id, const char* label);
+// A row: the label on the left, the key button (and the mode) in the control column.
+void bind_row(app::AppState& app, input::ActionId id, const char* label, const char* help = nullptr);
 } // namespace ui::keybind

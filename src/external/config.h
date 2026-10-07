@@ -61,19 +61,16 @@ inline constexpr float kMaxHeadHeight = 80.0f;            //   crouching (~45) t
 inline constexpr std::uint64_t kBindCaptureTimeoutMs = 6000;
 
 // --- Menu (ImGui) --------------------------------------------------------------------------------------------------
-inline constexpr float kMenuWidth = 920.0f;  // initial size in pixels (shrunk to fit small game windows)
+inline constexpr float kMenuWidth = 900.0f;  // initial size in pixels (shrunk to fit small game windows)
 inline constexpr float kMenuHeight = 620.0f;
-inline constexpr float kMenuMinWidth = 680.0f; // the menu can be resized, not below this
-inline constexpr float kMenuMinHeight = 440.0f;
+inline constexpr float kMenuMinWidth = 600.0f; // the menu can be resized, not below this (one column of panels)
+inline constexpr float kMenuMinHeight = 420.0f;
 inline constexpr float kMenuMaxScreenFraction = 0.92f;
-inline constexpr float kSidebarWidth = 190.0f;
-inline constexpr float kHeaderHeight = 60.0f;
-inline constexpr float kFontSize = 17.0f;      // base UI font size in pixels
-inline constexpr float kTitleFontSize = 22.0f; // header title
-inline constexpr float kPageTitleFontSize = 22.0f;
-inline constexpr float kRowLabelWidth = 170.0f; // the label column of "label: value" rows
-inline constexpr float kHeaderLogoSize = 38.0f; // the logo in the menu header
-inline constexpr float kHomeLogoSize = 96.0f;   // the logo on the Home page
+inline constexpr float kHeaderHeight = 54.0f;   // logo, name, close button
+inline constexpr float kTabBarHeight = 40.0f;   // the tabs under the header
+inline constexpr float kFontSize = 17.0f;       // base UI font size in pixels
+inline constexpr float kTitleFontSize = 19.0f;  // the app name in the header
+inline constexpr float kHeaderLogoSize = 32.0f; // the logo in the menu header
 
 // --- Overlay -------------------------------------------------------------------------------------------------------
 inline constexpr float kWatermarkMargin = 10.0f;   // from the top-left corner of the game's client area

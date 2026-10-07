@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -17,8 +18,6 @@ namespace ui::pages
 {
 namespace
 {
-constexpr float kLabelColumnWidth = 260.0f;
-
 void draw_conflicts(const app::AppState& app)
 {
     const std::vector<input::Conflict> conflicts = input::find_conflicts(app.settings.keybinds.binds);
@@ -35,63 +34,56 @@ void draw_conflicts(const app::AppState& app)
             text += (i == 0 ? "" : ", ") + std::string(input::action(conflict.actions[i]).label);
         }
     }
-    widgets::notice(text.c_str(), true);
+    widgets::notice(text.c_str(), widgets::Notice::danger);
     ImGui::Spacing();
 }
 
 void draw_category(PageContext& ctx, input::Category category)
 {
     const std::string title(input::category_name(category));
-    widgets::card_begin(ctx.fonts, title.c_str());
-    if (ImGui::BeginTable("##binds", 3, ImGuiTableFlags_SizingFixedFit))
+    widgets::panel_begin(ctx.fonts, title.c_str());
+    for (const input::ActionDef& def : input::actions())
     {
-        ImGui::TableSetupColumn("action", ImGuiTableColumnFlags_WidthFixed, scaled(kLabelColumnWidth));
-        for (const input::ActionDef& def : input::actions())
+        if (def.category == category)
         {
-            if (def.category != category)
-            {
-                continue;
-            }
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(def.label.data(), def.label.data() + def.label.size());
-            ImGui::TableSetColumnIndex(1);
-            keybind::key_button(ctx.app, def.id);
-            ImGui::TableSetColumnIndex(2);
-            keybind::mode_selector(ctx.app, def.id);
+            const std::string label(def.label);
+            keybind::bind_row(ctx.app, def.id, label.c_str());
         }
-        ImGui::EndTable();
     }
-    widgets::card_end();
+    widgets::panel_end();
 }
 } // namespace
 
 void draw_keybinds(PageContext& ctx)
 {
-    widgets::page_header(ctx.fonts, "Keybinds",
-                         "Every action you can put on a key or mouse button. Keys work while the game is in front.");
+    widgets::page_intro("Every action you can put on a key or mouse button. Keys work while the game is in front.");
     app::AppState& app = ctx.app;
     if (app.menu_key_failed)
     {
         widgets::notice("The menu key couldn't be registered: another program (or Windows) uses it as a hotkey. Pick "
                         "another one below.",
-                        true);
+                        widgets::Notice::warn);
         ImGui::Spacing();
     }
-    widgets::hint("Click a key button, then press any key or mouse button (Esc clears it). For Mouse 1, click "
-                  "outside the menu.");
-    ImGui::SameLine();
-    widgets::help_marker("Hold = on while held, Toggle = each press switches it, the rest fire once per press. While "
-                         "this menu is open only the menu key, panic and exit work. Clicking a key button again "
-                         "cancels; after 6 seconds it gives up.");
-    ImGui::Spacing();
     draw_conflicts(app);
-    for (const input::Category category : input::kCategories)
     {
-        draw_category(ctx, category);
+        // Alternate the categories between the columns, in registry order.
+        widgets::Columns columns;
+        for (std::size_t i = 0; i < input::kCategories.size(); i += 2)
+        {
+            draw_category(ctx, input::kCategories[i]);
+        }
+        columns.next();
+        for (std::size_t i = 1; i < input::kCategories.size(); i += 2)
+        {
+            draw_category(ctx, input::kCategories[i]);
+        }
     }
-    if (ImGui::Button("Reset every keybind"))
+    widgets::hint("Click a key button, then press any key or mouse button (Esc clears it, clicking again cancels, after "
+                  "6 seconds it gives up). For Mouse 1, click outside the menu. Hold = on while held, Toggle = each "
+                  "press switches it, the rest fire once per press. While this menu is open only the menu key, panic "
+                  "and exit work.");
+    if (widgets::button("Reset every keybind", widgets::Tone::danger))
     {
         app.capture.cancel();
         app.settings.keybinds = settings::KeybindSettings{};

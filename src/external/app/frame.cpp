@@ -206,7 +206,9 @@ private:
         overlay_.enable_menu_hotkey((game_focused || overlay_focused) && !capturing, menu_key());
         state_.menu_key_failed = overlay_.menu_hotkey_failed();
 
-        const bool menu_key_pressed = events.menu_key && !capturing;
+        // The menu's close button works like the menu key.
+        const bool close_clicked = std::exchange(state_.requests.close_menu, false);
+        const bool menu_key_pressed = (events.menu_key && !capturing) || (close_clicked && state_.menu_open);
         if (menu_key_pressed && state_.menu_open)
         {
             close_menu(true);
@@ -251,6 +253,7 @@ private:
         run_triggerbot(playing);
 
         imgui_.begin_frame();
+        ui::use_theme(state_.settings.overlay); // the profile's theme and accent, before anything is drawn
         state_.fps = imgui_.framerate();
         draw_world();
         ui::draw_hud(imgui_.fonts(), imgui_.logo(), state_);

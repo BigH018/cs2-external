@@ -1,27 +1,22 @@
 #pragma once
 
-// Controls the feature pages share: a checkbox with a (?), colour pickers, enum combos and the shared team mode
-// (keys: ui/keybind_widgets). Each returns true when the user changed the value.
+// Rows the feature pages share: enum choices, the shared team mode and the max-distance slider (keys:
+// ui/keybind_widgets). Each returns true when the user changed the value.
 
-#include <imgui.h>
+#include <cstddef>
+#include <span>
 
-#include "color.h"
 #include "settings/settings.h"
+#include "ui/widgets.h"
 
 namespace ui::pages
 {
-// A checkbox with a (?) after it.
-bool check(const char* label, bool* value, const char* help);
-
-// A colour swatch with an alpha bar.
-bool colour(const char* label, Color& value);
-
-// An enum as a combo; `names` lists the enumerators in order.
-template <class Enum>
-bool combo(const char* label, Enum& value, const char* const* names, int count)
+// An enum as a choice row (segmented buttons, or a dropdown when they don't fit); `names` in enumerator order.
+template <class Enum, std::size_t N>
+bool choice(const char* label, Enum& value, const char* const (&names)[N], const char* help = nullptr)
 {
     int index = static_cast<int>(value);
-    if (ImGui::Combo(label, &index, names, count))
+    if (widgets::choice_row(label, &index, std::span<const char* const>(names, N), help))
     {
         value = static_cast<Enum>(index);
         return true;
@@ -29,9 +24,9 @@ bool combo(const char* label, Enum& value, const char* const* names, int count)
     return false;
 }
 
-// The team mode every feature shares (settings::GeneralSettings), with its (?) explaining it.
-bool team_mode_combo(settings::TeamMode& mode);
+// The team mode every feature shares (settings::GeneralSettings), with its help.
+bool team_mode_row(settings::TeamMode& mode);
 
 // A max-distance slider in metres; all the way left = no limit.
-bool max_distance_slider(float& metres, const char* help);
+bool max_distance_row(float& metres, const char* help);
 } // namespace ui::pages
