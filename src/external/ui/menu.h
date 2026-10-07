@@ -33,6 +33,9 @@ struct MenuState
     std::string selected_profile;        // in the list (empty = the current profile)
     std::string confirm_delete;          // "Really delete?" is showing for this profile
     std::array<char, 64> profile_name{}; // the name box (Save as, Rename)
+
+    // Settings page, Exit card.
+    bool confirm_exit = false; // "Really exit?" is showing (only with unsaved changes)
 };
 
 // `logo` may be null (then the logo spots stay empty).

@@ -4,6 +4,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstdint>
+#include <exception>
 #include <filesystem>
 #include <format>
 #include <optional>
@@ -122,35 +123,20 @@ public:
             return 1;
         }
         const settings::KeybindSettings& keys = state_.settings.keybinds;
-        logger::info("Overlay running. {} opens the menu, {} is panic. Exit: {}, Ctrl+C here (or close this window), "
-                     "or Alt+F4 while the menu is open.",
+        logger::info("Overlay running. {} opens the menu, {} is panic. Exit: {}, the Exit button (Settings), Ctrl+C "
+                     "here (or close this window), or Alt+F4 while the menu is open.",
                      input::key_name(menu_key()), input::key_name(keys.bind(input::ActionId::panic).key),
                      input::key_name(keys.bind(input::ActionId::exit).key));
 
-        int exit_code = 0;
-        while (!core::shutdown_requested.load())
+        int exit_code = 1;
+        try
         {
-            const ui::OverlayWindow::Events events = overlay_.pump();
-            if (events.close_requested)
-            {
-                logger::info("Overlay closed: exiting");
-                break;
-            }
-            if (!core::is_running(ctx_.process))
-            {
-                logger::info("cs2.exe has closed: exiting");
-                break;
-            }
-            if (!frame(events))
-            {
-                exit_code = 1;
-                break;
-            }
-            if (exit_requested_)
-            {
-                logger::info("Exit key: exiting");
-                break;
-            }
+            exit_code = loop();
+        }
+        catch (const std::exception& e)
+        {
+            // Still shut down properly below: the attack button must not stay pressed in the game.
+            logger::error("The overlay stopped on an error: {}", e.what());
         }
 
         stop_features(); // let go of attack if the triggerbot holds it
@@ -165,10 +151,45 @@ public:
     }
 
 private:
+    // Frames until something ends the run. Returns the exit code.
+    int loop()
+    {
+        while (!core::shutdown_requested.load())
+        {
+            const ui::OverlayWindow::Events events = overlay_.pump();
+            if (events.close_requested)
+            {
+                exit_requested_ = "Overlay closed (Alt+F4)";
+            }
+            if (!exit_requested_ && !core::is_running(ctx_.process))
+            {
+                logger::info("cs2.exe has closed: exiting");
+                return 0;
+            }
+            if (!exit_requested_ && !frame(events))
+            {
+                return 1;
+            }
+            if (exit_requested_)
+            {
+                // You asked for it: no "Press Enter to exit" in the console afterwards (main.cpp).
+                logger::info("{}: exiting", exit_requested_);
+                core::shutdown_requested = true;
+                return 0;
+            }
+        }
+        return 0;
+    }
+
     // One frame. false = the overlay can't go on (device lost).
     bool frame(const ui::OverlayWindow::Events& events)
     {
         state_.now_ms = GetTickCount64();
+        if (std::exchange(state_.requests.exit, false))
+        {
+            exit_requested_ = "Exit button";
+            return true;
+        }
         // Taken every frame, also while hidden: presses made while we aren't listening are dropped, not saved up.
         const input::PressCounts presses = overlay_.take_presses();
         if (!find_game_window())
@@ -386,7 +407,7 @@ private:
     {
         if (actions_.did_fire(input::ActionId::exit))
         {
-            exit_requested_ = true;
+            exit_requested_ = "Exit key";
             return;
         }
         if (actions_.did_fire(input::ActionId::panic))
@@ -582,6 +603,12 @@ private:
         settings.spectators.enabled = false;
         keybinds_.reset_toggles();
         actions_ = {};
+        // A preset or profile load clicked just before would otherwise switch features straight back on.
+        state_.requests.preset.reset();
+        if (state_.requests.profile && state_.requests.profile->op == ProfileOp::load)
+        {
+            state_.requests.profile.reset();
+        }
         stop_features();
         if (state_.menu_open)
         {
@@ -749,7 +776,7 @@ private:
     input::KeybindEngine keybinds_;
     input::KeySet previous_down_; // last frame's held keys (presses without raw input)
     input::ActionStates actions_; // this frame's keybind states
-    bool exit_requested_ = false; // the exit key fired
+    const char* exit_requested_ = nullptr; // what asked to exit (the exit key, the Exit button, Alt+F4); null = run on
     features::Triggerbot triggerbot_;
     bool attack_down_ = false; // what we last wrote to the attack button
     bool write_warned_ = false;

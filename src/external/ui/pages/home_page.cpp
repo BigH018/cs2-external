@@ -112,9 +112,9 @@ void draw_how_to(PageContext& ctx)
                       .c_str());
     widgets::hint("The overlay is a separate, click-through window on top of the game. It hides when the game loses "
                   "focus (Alt+Tab) and follows the game window when it moves or changes resolution.");
-    widgets::hint(std::format("Panic ({}) turns every feature off. To exit: {}, Ctrl+C in the console window (or close "
-                              "it), or Alt+F4 while the menu is open. The game keeps running. Every key can be changed "
-                              "on the Keybinds page.",
+    widgets::hint(std::format("Panic ({}) turns every feature off. To exit: {}, the Exit button on the Settings page, "
+                              "Ctrl+C in the console window (or close it), or Alt+F4 while the menu is open. The game "
+                              "keeps running. Every key can be changed on the Keybinds page.",
                               input::key_name(keys.bind(input::ActionId::panic).key),
                               input::key_name(keys.bind(input::ActionId::exit).key))
                       .c_str());

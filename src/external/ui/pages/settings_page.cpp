@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <format>
 #include <string>
 #include <utility>
 #include <vector>
@@ -6,6 +7,8 @@
 #include <imgui.h>
 
 #include "config.h"
+#include "input/actions.h"
+#include "input/keys.h"
 #include "settings/presets.h"
 #include "settings/profile_store.h"
 #include "ui/pages/pages.h"
@@ -208,6 +211,48 @@ void draw_overlay(PageContext& ctx)
                          "right on the edges of the game's picture, in windowed mode too.");
     widgets::card_end();
 }
+
+// Exit straight away, or after one more click if there are unsaved changes.
+void draw_exit(PageContext& ctx)
+{
+    app::AppState& app = ctx.app;
+    MenuState& menu = ctx.menu;
+    widgets::card_begin(ctx.fonts, "Exit");
+    widgets::hint(std::format("Closes the tool cleanly: lets go of anything it pressed in the game, removes the "
+                              "overlay and closes the handle. The game keeps running, as if the tool was never "
+                              "started. Same as the exit key ({}).",
+                              input::key_name(app.settings.keybinds.bind(input::ActionId::exit).key))
+                      .c_str());
+    const bool unsaved = app.unsaved_changes();
+    if (!unsaved)
+    {
+        menu.confirm_exit = false;
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, theme::kDanger);
+    if (menu.confirm_exit)
+    {
+        if (ImGui::Button("Really exit? Unsaved changes are lost"))
+        {
+            app.requests.exit = true;
+        }
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel##exit"))
+        {
+            menu.confirm_exit = false;
+        }
+    }
+    else
+    {
+        if (ImGui::Button("Exit the tool"))
+        {
+            app.requests.exit = !unsaved;
+            menu.confirm_exit = unsaved;
+        }
+        ImGui::PopStyleColor();
+    }
+    widgets::card_end();
+}
 } // namespace
 
 void draw_settings(PageContext& ctx)
@@ -216,7 +261,7 @@ void draw_settings(PageContext& ctx)
     draw_profiles(ctx);
     draw_presets(ctx);
     draw_overlay(ctx);
-    widgets::planned_card(ctx.fonts, "Phases 9-10",
-                          {"An exit button and the robustness pass (Phase 9)", "Menu size (Phase 10)"});
+    draw_exit(ctx);
+    widgets::planned_card(ctx.fonts, "Phase 10", {"Menu size"});
 }
 } // namespace ui::pages

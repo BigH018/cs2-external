@@ -7,7 +7,8 @@
 
 namespace core
 {
-// Ctrl+C, Ctrl+Break or the console window closing: the main loop finishes its frame and shuts down.
+// Ctrl+C, Ctrl+Break or the console window closing: the main loop finishes its frame and shuts down. app/frame also
+// sets it when you ask to exit (exit key, Exit button, Alt+F4), so main() doesn't wait for Enter afterwards.
 inline std::atomic<bool> shutdown_requested{false};
 // Set by main() once the overlay is gone and the handle is closed, so the handler can let Windows end the process.
 inline std::atomic<bool> shutdown_complete{false};
