@@ -369,8 +369,11 @@ cs2-external/
                                      raw_keyboard_vk (L/R Shift/Ctrl/Alt)
         bind_capture.h/.cpp       ✅ PURE: BindCapture (release wait, next key, Esc clears / cancels, timeout)
       settings/
-        settings.h                ✅ Settings { overlay, general (team mode), esp, aimbot, triggerbot, radar,
-                                     bomb_timer, spectators, keybinds } + enums; every struct has a defaulted ==
+        settings.h                ✅ Settings { overlay (menu theme + accent, watermark, outline), general (team mode),
+                                     esp, aimbot, triggerbot, radar, bomb_timer, spectators, keybinds } + enums; every
+                                     struct has a defaulted ==
+        themes.h/.cpp             ✅ PURE: MenuTheme (Midnight, Black, Graphite, Violet, Ice) + ThemeColours table,
+                                     theme_name, contrast_ratio (WCAG), text_on (text colour on an accent fill)
         profile_json.h/.cpp       ✅ PURE: Settings <-> JSON text: one field list per section (nested: colours,
                                      weapons) for write + read; forgiving load (warnings, clamping), schema_version
         profile_store.h/.cpp      ✅ ProfileStore(folder): clean_name, list ("default" first), load / save (atomic:
@@ -383,19 +386,28 @@ cs2-external/
         overlay_window.h/.cpp     ✅ transparent, click-through, topmost window + own D3D11 device/swap chain; covers the
                                      game's client rect; the menu hotkey (the bound key); raw input (keyboard +
                                      mouse, background) → take_presses; set_interactive
-        theme.h/.cpp              ✅ dark navy palette (AC's), apply_theme, scaled()
-        widgets.h/.cpp            ✅ page_header, card, hint, help_marker, info_row, notice, pill, planned_card,
-                                     image_rounded
-        menu.h/.cpp               ✅ header (logo, title, pills) + grouped sidebar + current page; MenuState (page,
-                                     the Profiles card's selection / name box / delete confirmation)
+        theme.h/.cpp              ✅ Palette (theme colours + accent, derived hover/soft/on-accent), use_theme (rebuilds
+                                     palette + ImGui colours when the theme or accent changes), apply_style, Fonts
+                                     (regular, semibold, bold), scaled()
+        icons.h/.cpp              ✅ tab icons drawn with the draw list (home, crosshair, bolt, ESP box, radar,
+                                     keyboard, gear)
+        widgets.h/.cpp            ✅ Columns (two columns of panels, one under 720 px), page_intro, panel_begin/end
+                                     (title + main switch), subheading; rows (label + "?" left, control column right):
+                                     switch / slider / choice (segmented or dropdown) / colour / info; toggle_switch
+                                     (animated), segmented, chips, button (normal/accent/danger), help_marker, hint,
+                                     notice, pill, dot, image_rounded
+        menu.h/.cpp               ✅ header (logo, name, "External" pill, close button) + icon tabs (green dot = that
+                                     feature is on; icons only for unselected tabs when narrow) + current page;
+                                     MenuState (page, Profiles selection / name box / delete + exit confirmations)
         hud.h/.cpp                ✅ watermark (logo + active features) + frame outline, background draw list
-        keybind_widgets.h/.cpp    ✅ key_button (capture, conflict colours), mode_selector, bind_row
-        pages/                    ✅ pages.h + one file per page: home (logo, live status, map/players/you), esp (every
-                                     ESP option, colour pickers), aimbot and triggerbot (every option + live status),
-                                     settings (Profiles, Presets, overlay switches, Exit), misc (radar + radar colours, bomb timer, spectator
-                                     list), keybinds (every action by category, conflicts, reset); bind rows on the
-                                     feature pages; controls.h/.cpp: shared check, colour, combo, team_mode_combo,
-                                     max_distance_slider
+        keybind_widgets.h/.cpp    ✅ key_button (capture, conflict colours), mode_selector (Hold | Toggle segmented),
+                                     bind_row (a row: key + mode in the control column)
+        pages/                    ✅ pages.h + one file per page, each two columns of panels: home (match status line;
+                                     Features switches, Presets; Match, Tool, Keys), aimbot / triggerbot (main switch in
+                                     the panel title, every option, live status), esp, misc (radar + colours, bomb
+                                     timer, spectator list), keybinds (every action by category, conflicts, reset),
+                                     settings (Profiles; Appearance: theme tiles + accent; Overlay; Exit);
+                                     controls.h/.cpp: choice<Enum>, team_mode_row, max_distance_row
       color.h                     ✅ Color (RGBA floats): rgb(0xRRGGBB), rgba(0xRRGGBBAA) / to_rgba, faded, lerp
       config.h                    ✅ PURE: branding, pointer bounds, page size, process/module names, --diag flag and
                                      scan limits, bind capture timeout, menu sizes, timings; [5+] Range<T> + every
@@ -460,6 +472,8 @@ cs2-external/
                                      profiles/default.json == code defaults (writes default.json.expected on mismatch)
     settings/test_profile_store.cpp ✅ names, save/list/load, overwrite, read-only default, missing/broken/warnings,
                                      rename/delete (+ last marker), last profile + startup fallback (temp folder)
+    settings/test_themes.cpp      ✅ WCAG contrast reference values, every theme dark + readable (text, dim, faint,
+                                     accent, status, text on the accent), defaults, out-of-range theme, text_on
     settings/test_presets.cpp     ✅ untouched parts (keybinds, colours, team options, distances, positions), ranges,
                                      Off / Chill / Medium / Rage values
     input/test_keys.cpp           ✅ key table (sorted, unique, no Escape / generic modifiers), names, round trip,
@@ -534,8 +548,8 @@ main loop (60+ Hz, or vsync-limited):
 to shut down safely.**
 
 ### 6.5 Settings and keybinds (same design as AC)
-- One `Settings` root (pure structs): `overlay`, `general`, `esp`, `aimbot`, `triggerbot`, `radar`, `bomb_timer`,
-  `spectators`, `keybinds`.
+- One `Settings` root (pure structs): `overlay` (menu theme + accent too), `general`, `esp`, `aimbot`, `triggerbot`,
+  `radar`, `bomb_timer`, `spectators`, `keybinds`.
 - Numeric ranges defined once (`config.h`) and used by the UI sliders and the JSON clamping.
 - Colours stored as RGBA floats in memory, `"#RRGGBBAA"` in JSON.
 - Profiles live in `profiles\` next to the exe; `default` is built in.
@@ -833,6 +847,17 @@ Rules:
   console too instead of waiting for Enter. An error inside the overlay loop still lets go of attack and removes the
   overlay. Panic also drops a preset or profile load clicked just before it. The console banner says "External Cheat
   by BigH" (it still said "Phase 5"). Robustness review: see `docs/DEVLOG.md` (2026-10-07, Phase 9).
+- **Phase 10 (done, verified in-game by the user 2026-10-07):** the menu is redesigned. Header: logo, "External Cheat by
+  BigH", the "External" pill and a close button (same as the menu key). Under it a row of **tabs with drawn icons**
+  (Home, Aimbot, Triggerbot, ESP, Misc, Keybinds, Settings); a green dot on a tab means that feature is on; in a narrow
+  menu only the selected tab keeps its label. Every page is **two columns of panels** (one column under 720 px): a
+  feature's main switch sits in its panel's title, and every option is a row with the label (and a "?" with help) on
+  the left and its control in a column that lines up on the right: switches, sliders, segmented buttons (a dropdown
+  when they don't fit), colour swatches. **Home** is a dashboard: the match status, every feature's switch, the
+  **presets** (moved here from Settings), Match, Tool and Keys panels. **Settings**: Profiles, **Appearance** (five
+  dark themes as preview tiles: Midnight (default, black/grey/off-white), Black, Graphite, Violet, Ice; an accent
+  colour picker; "Use the theme's accent"), Overlay (watermark, frame outline), Exit. The theme and accent are saved
+  in profiles (`overlay.theme`, `overlay.accent`); old profiles load with the defaults. The watermark follows the theme.
 
 ---
 
@@ -1028,6 +1053,21 @@ Rules:
   Rename only with a `schema_version` bump and a migration in `profile_json.cpp`.
 - **Each build config has its own profiles** (`bin\Debug\profiles`, `bin\Release\profiles`).
 - **Loading a profile resets toggle keys and cancels a bind capture** (`settings_replaced` in `app/frame`).
+
+### Menu (Phase 10 design)
+- **Colours only through `ui::palette()`**, which `ui::use_theme` rebuilds when the theme or accent changes (called
+  every frame in `app/frame` after NewFrame). No inline hex values in pages; a new theme is a row in
+  `settings/themes.h`, and `test_themes` checks it stays dark and readable.
+- **A theme's accent becomes a saved setting**, so it must be opaque and byte-exact (`Color::rgb(0xRRGGBB)`).
+- **`help_marker` and `dot` are sized to the frame height**: use them only on a line of framed controls (a row, a panel
+  title, after a button). On a plain text line they'd sit low.
+- **`widgets::Columns` isn't nestable** (it's an ImGui table); close it (scope) before full-width content under it.
+- **Segmented buttons are equally wide**: size them for the longest name (`bind_row` does), or text gets clipped.
+- **Checking the menu without the game's focus:** the menu only opens with the menu key, so screenshots of the real
+  menu come from a scratch harness (outside the repo) that compiles `src/external` (minus `app/` and `main.cpp`) with
+  `cl`, renders `ui::draw_menu` with a mock `AppState` into an offscreen D3D11 texture and saves a BMP per page.
+  Link against `bin\Debug\vendor.lib` with `/MTd` and the v143 toolset (`vcvars64.bat -vcvars_ver=14.44`); add
+  `external\nlohmann` to the includes.
 
 ### Tests (doctest)
 - **Define `DOCTEST_CONFIG_USE_STD_HEADERS`** (set in `tests.vcxproj`).
@@ -1313,10 +1353,14 @@ cursor problem; after exit the game behaves exactly like an untouched game.
 ### Phase 10: UI redesign
 - [x] Rename to the final name (decided with the user): **External Cheat - by BigH**, done in Phase 1
 - [x] Logo embedded (menu header + Home via an ImGui user texture): done early, in Phase 1
-- [ ] Home dashboard + grouped sidebar with icons (drawn with the draw list, no icon font)
-- [ ] Colours from the logo, (?) help tooltips, two-column pages, menu size setting
-- [ ] Builds with zero warnings (Debug + Release); tests pass
-- [ ] Verified in-game by the user
+- [x] Home dashboard + **top tabs** with icons (the user picked tabs over a sidebar; icons drawn with the draw list,
+      no icon font)
+- [x] Colours: **dark black / grey / off-white** (the user's choice, easy on the eyes at night) as the default theme
+      "Midnight", plus four more (Black, Graphite, and Violet / Ice from the logo) and an accent colour picker, saved in
+      profiles; (?) help tooltips on every option; two-column pages
+- ~~Menu size setting~~: not chosen by the user (2026-10-07); the menu is still resizable by dragging its corner
+- [x] Builds with zero warnings (Debug + Release); tests 220/220
+- [x] Verified in-game by the user (2026-10-07): "so much better, so clean"; approved
 
 ### Phase 11: Educational README
 - [ ] A comprehensive, educational `README.md`: what the project is (and isn't: §1), features, how it works
@@ -1448,7 +1492,13 @@ against the map's collision geometry, read from the game files (not from game me
   overlay start checked against the running game. **No offset changed.** Not checked here: anything that needs keys
   or clicks in the game (exit key, Exit button, panic, 10 start/stop cycles, map change, game close).
 
-**Next:** Phase 10, UI redesign.
+- **Phase 10: done, verified in-game by the user (2026-10-07), approved, committed and pushed.** The whole menu redesigned (top tabs with
+  icons, two columns of panels, aligned label/control rows, switches, segmented buttons, chips), five dark themes +
+  accent colour (saved in profiles, `overlay.theme` / `overlay.accent`), restyled watermark, a close button. Debug +
+  Release zero warnings, tests 220/220; every page rendered offscreen with mock data (scratch harness) and checked in
+  four themes and a narrow window; the overlay starts against the running game. **No offset changed.**
+
+**Next:** Phase 11, educational README.
 
 ---
 
@@ -1661,6 +1711,15 @@ against the map's collision geometry, read from the game files (not from game me
   button asks for confirmation only when there are unsaved changes. When the game closes the tool **exits** rather
   than waiting for a new cs2.exe (the handle, module bases and offsets belong to that process); restart the tool with
   the game.
+- **2026-10-07 (Phase 10, user choices):** **Top tabs + two columns of panels** (over an icon rail or a feature list),
+  so it no longer looks like the AC project's sidebar. **Look: dark black / grey / off-white**, easy on the eyes at
+  night (the user's words), as the default theme "Midnight"; customisation = **themes + an accent colour** only (the
+  user didn't pick menu size / density, menu look options or watermark options). Picking a theme also sets its accent.
+  The header keeps only the "External" pill (the user's Phase 1 wish) plus a close button; the match status lives on
+  Home. Presets moved from Settings to Home (dashboard). The Home page lost its big logo: the header already shows it.
+- **2026-10-07 (Phase 10):** Themes are **pure data in `settings/themes`** (so the default accent in `settings.h` and the
+  palette come from one table, and contrast is unit-tested); `ui/theme` turns them into ImGui colours. Theme and accent
+  live in the existing `overlay` profile section (two new keys, no schema bump: missing keys keep their defaults).
 - **2026-10-06 (Phase 3):** Weapons are named from the **item definition index** (table in `game/weapon.cpp`), not the
   designer name, because some weapons share a designer name (USP-S / P2000). Each also gets a `WeaponClass` for the
   Phase 5 triggerbot filter.

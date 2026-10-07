@@ -578,3 +578,56 @@ D3D11 + ImGui ready, game window found), then was force-closed (no input is ever
 the game closing.
 
 **User (2026-10-07):** all good; approved for commit. Phase 9 done.
+
+## 2026-10-07: Phase 10, UI redesign
+
+The user's brief: more readable and user-friendly, customisable, a clean layout, and clearly different from the AC
+project's look, keeping the logo and the name. Their choices: **top tabs + two columns of panels**; a **dark black /
+grey / off-white** look that is easy on the eyes at night; customisation = **themes + accent colour**.
+
+**Built**
+- `settings/themes` (pure): five dark themes as one table. Midnight (default: graphite, off-white text, soft white
+  accent), Black (OLED), Graphite (lighter grey, steel-blue accent), Violet (the logo's turtleneck + gold sparkles), Ice
+  (the logo's teal). Also `contrast_ratio` (WCAG) and `text_on` (the readable text colour on an accent fill).
+  `OverlaySettings` gained `theme` and `accent`, saved in profiles (`overlay.theme`, `overlay.accent`).
+- `ui/theme`: a runtime `Palette` (the theme plus the accent, with derived hover / soft / on-accent colours).
+  `use_theme` rebuilds it and ImGui's colours only when they change (called every frame after NewFrame). Fonts gained
+  Segoe UI Semibold for titles and tabs.
+- `ui/widgets` rewritten as a small UI kit:
+  - `Columns`: two columns of panels, one under 720 px.
+  - Panels with the feature's main switch in the title.
+  - Rows: label and "?" on the left, the control in an aligned column on the right (switch, slider, choice, colour,
+    info). A choice is segmented buttons, or a dropdown when they don't fit. A label too long for its column puts the
+    control on the next line.
+  - An animated switch, toggle chips, buttons (normal / accent / danger), notices with a coloured bar, and a drawn
+    "?" help marker.
+- `ui/icons`: seven line icons drawn with the draw list (no icon font).
+- `ui/menu`: a header (logo, name, "External" pill, close button) and a tab bar with icons. A green dot marks the tabs
+  whose feature is on. When the menu is narrow, only the selected tab keeps its label.
+- Every page rebuilt in two columns. Home is a dashboard: status line; Features (every switch) and Presets; Match, Tool
+  and Keys. Settings: Profiles; Appearance (theme preview tiles, accent picker, "Use the theme's accent"); Overlay;
+  Exit. Hold | Toggle and every 2-3 option choice are segmented buttons.
+- The watermark follows the theme (chrome background, hairline border, accent dots).
+- `tests/settings/test_themes.cpp` (+4 cases): the WCAG reference values; every theme is dark, with readable text,
+  dimmed text, accent, status colours and text on the accent; the defaults; an out-of-range theme falls back.
+  Theme and accent were added to the profile round-trip and preset tests. `profiles/default.json` gained the two keys.
+
+**Problems and fixes**
+- `ImDrawList::AddRect` / `AddPolyline` with the old (flags, thickness) argument order: `= delete` in ImGui 1.92.8+
+  (C2280), as CLAUDE.md warns. Swapped.
+- The first offscreen renders showed:
+  - The "?" markers and the status dot sat high: they're now centred on the frame height.
+  - Colour swatches weren't right-aligned.
+  - At ~700 px the Hold | Toggle segments clipped "Toggle". Now the layout drops to one column under 720 px, and the
+    mode selector is sized for its longest name.
+  - The Home banner repeated the header's logo and name, so it was replaced by a status line.
+- Backslashes in bash again when generating the harness build script; generated it from PowerShell instead.
+
+**Verified here:** Debug and Release zero warnings; tests 220/220 in both. Every page was rendered offscreen with mock
+data by a scratch harness (outside the repo; CLAUDE.md §10 "Menu"), in Midnight, Violet, Graphite and Ice, and in a
+narrow window (760 x 640), then checked on the screenshots. The overlay starts against the running game, and the
+user's existing profile loads with 0 warnings (no theme keys: defaults).
+**Not verified here:** the menu in the real game (opening it needs the menu key), clicking anything, switching themes
+live, the close button.
+
+**User (2026-10-07):** "so much better, so clean"; approved for commit. Phase 10 done.
