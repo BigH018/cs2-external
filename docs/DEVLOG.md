@@ -428,3 +428,68 @@ in place of the hitsound.
 **Verified here:** Debug and Release zero warnings; tests 167/167 in both.
 
 Phase 6 ends with the radar, the bomb timer and the spectator list. Next: Phase 7, keybind engine.
+
+## 2026-10-07: Phase 7, keybind engine
+
+**Built** (the AC project's engine, ported and adapted to the external overlay)
+- `input/keys`: every bindable key (letters, digits, numpad, F1-F24, navigation, punctuation, L/R Shift/Ctrl/Alt,
+  Mouse 1-5) with names, `KeySet` (bitset<256>), `vk_from_name` (case-insensitive, for Phase 8's JSON),
+  `is_mouse_button`, `is_modifier`, `can_be_hotkey`. Generic Shift/Ctrl/Alt and Escape aren't bindable.
+- `input/actions`: the `ActionId` registry (constexpr, in id order, checked by a static_assert): menu, panic (END),
+  exit (DELETE), aim key (Mouse 1, hold), aimbot on/off, trigger key (Mouse 4, hold), triggerbot on/off, ESP / radar /
+  bomb timer / spectator list on/off (unbound). `BindMode` (hold / toggle / press) moved here from `settings`.
+- `input/keybinds`: `KeybindEngine` (rising edges, HOLD / TOGGLE / PRESS, priming frame, suspension: menu open = only
+  panic and exit, capture = nothing), `find_conflicts`.
+- `input/bind_capture`: waits for release, takes the next key (lowest VK), Escape clears, timeout 6 s
+  (`config::kBindCaptureTimeoutMs`). The menu key listens only to keys `RegisterHotKey` takes and Escape cancels it.
+- `input/key_poll`: `GetAsyncKeyState` over the table + Escape, `is_key_down`.
+- `settings::KeybindSettings` (the binds); `AimbotSettings::key/mode` and `TriggerbotSettings::key` removed;
+  `TriggerActivation` is now always / key (the key's own mode says hold or toggle). `features/activation.h` removed.
+- `app/frame`: keys are polled while the game or the overlay is in front, a running capture is fed (Mouse 1 left out
+  while the cursor is over the menu), then the engine, then the actions (exit, panic: every feature off + toggles off
+  + menu closed, the on/off keys). The aimbot and triggerbot read their key states from the engine.
+- `ui/overlay_window`: the menu hotkey is registered with the bound key (re-registered when it changes, released
+  while a capture runs); a failure is logged once per key and shown on the Keybinds page.
+- UI: `ui/keybind_widgets` (key button with capture / conflict colours, Hold/Toggle combo, bind row), a **Keybinds**
+  page (SETUP group: every action by category, conflict notice, reset), bind rows on the Aimbot, Triggerbot, ESP and
+  Misc pages. Home and the console name the bound keys.
+
+**Problems and fixes**
+- A capture ending on a key press would fire that key's action in the same frame (bind panic to F → instant panic).
+  The frame a capture ends still counts as `Suspension::capture`, so the engine records the key as already down.
+- Binding Mouse 1 by clicking would be ambiguous with clicking the menu (the key button's own click restarted the
+  capture). Mouse 1 is left out of the capture while ImGui wants the mouse: it's bound by clicking outside the menu,
+  and clicking the key button again cancels.
+- The menu key can't be a mouse button or a modifier (RegisterHotKey) and can't be unbound (the menu would never open
+  again): enforced in `key_allowed` and the capture.
+- Python heredocs collapsed backslashes again in the `.vcxproj` edit (`\a` → bell); redone with the Write/Edit tools.
+
+**Verified here:** Debug and Release zero warnings; tests 186/186 in both (+20: key table and names, registry,
+engine modes / priming / suspension / conflicts, capture rules, keybind defaults; the old `KeyActivation` test
+removed). Started against the running game (de_mirage bot match): `--diag` part all 67 OK, the console names INSERT /
+END / DELETE, the overlay found the window and the match. **Not verified here:** any key press, the capture, the
+Keybinds page on screen (no input was sent to the game).
+
+### Later the same day: user check, presses from raw input
+
+**User check:** every keybind works, but the on/off keys "had to be held" and spamming them lost presses.
+**Cause:** keys were polled once per overlay frame, and a press was a difference between two polls. While the game
+takes the GPU the overlay's frames get slow (with the menu open the game sleeps, so everything felt fine there), so a
+tap could start and end between two polls. Not measured directly (CS2 wasn't in front without taking focus from the
+user), but it explains both symptoms; the frozen test bots hid any ESP lag.
+**Fix (the user chose raw input over a polling thread or GetAsyncKeyState's low bit):**
+- `ui/overlay_window` registers keyboard + mouse raw input with `RIDEV_INPUTSINK` and feeds every `WM_INPUT` to a new
+  pure `input/key_tracker` (counts key-downs, filters auto-repeat, resolves L/R Shift/Ctrl/Alt, maps mouse button
+  flags). The hidden wait no longer wakes on raw input.
+- `input/keybinds`: the engine takes a `KeyFrame` (held keys from `GetAsyncKeyState` + press counts from raw input)
+  and flips toggles once per press; `ActionStates` carries press counts. `presses_from_edges` is the fallback if raw
+  input can't be registered. The capture sees keys held or pressed during the frame.
+- `app/frame`: takes the presses at the top of every frame (also hidden: presses in other programs are dropped), and
+  an on/off key flips its feature once per press.
+
+**Verified here:** Debug and Release zero warnings; tests 191/191 (+5: raw keyboard mapping, auto-repeat, taps per
+frame, mouse flags, saturation; engine tests rewritten for press counts). Against the running game: no raw input
+warning; CPU over 6 s the same as the previous build (1.5-2.2 s each, measured side by side; the cost was there
+before, likely the driver in `Present`). **Not verified here:** the key presses themselves.
+
+**User (2026-10-07):** all good after the fix (on/off keys flip on each tap); approved for commit. Phase 7 done.

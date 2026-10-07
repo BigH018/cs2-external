@@ -342,7 +342,6 @@ cs2-external/
         targeting.h/.cpp          ✅ is_enemy, is_live_target, is_visible_to, distance_metres, within_distance (shared)
         aimbot.h/.cpp             ✅ aim_point, find_candidates, select_target, compute_aim, fov_circle
         triggerbot.h/.cpp         ✅ trigger_target, trigger_block (reasons), Triggerbot state machine
-        activation.h              ✅ KeyActivation: hold / toggle from a polled key (until Phase 7)
         feature_summary.h/.cpp    ✅ ActiveFeatures + feature_summary() → "ESP · Aimbot" for the watermark
         radar.h/.cpp              ✅ radar_panel (corner), radar_offset / radar_direction (world → radar, rotated or
                                      north-up), clamp_to_square, build_radar → primitives (dots, facing, names, edge)
@@ -357,15 +356,19 @@ cs2-external/
         panel.h/.cpp              ✅ PanelWriter (PURE): rows, bars with marks, background + border (bomb timer,
                                      spectator list)
       input/
-        keys.h                    ✅ kBindableKeys (the keys Phase 5 features can use), key_name, key_index
-        keys.cpp                  🔲 [7] every VK ↔ name, KeySet
-        actions.h/.cpp            🔲 [7] ActionId registry
-        keybinds.h/.cpp           🔲 [7] HOLD/TOGGLE/PRESS engine
-        key_poll.h/.cpp           🔲 [7] GetAsyncKeyState polling
-        bind_capture.h/.cpp       🔲 [7] bind capture
+        keys.h/.cpp               ✅ PURE: every bindable VK ↔ name (Mouse 1-5, letters, digits, F1-F24, numpad, L/R
+                                     modifiers...), KeySet, vk_from_name, is_mouse_button, is_modifier, can_be_hotkey
+        actions.h/.cpp            ✅ PURE: BindMode, Bind, ActionId registry (constexpr, id order) + defaults,
+                                     categories, allowed modes, key_allowed (the menu key: keyboard, never unbound)
+        keybinds.h/.cpp           ✅ PURE: KeyFrame (held + press counts), KeybindEngine (HOLD/TOGGLE/PRESS by press
+                                     count, priming, suspension), presses_from_edges (fallback), find_conflicts
+        key_poll.h/.cpp           ✅ GetAsyncKeyState polling (poll_keys, is_key_down): the held keys
+        key_tracker.h/.cpp        ✅ PURE: KeyTracker counts presses from raw input events (auto-repeat filtered),
+                                     raw_keyboard_vk (L/R Shift/Ctrl/Alt)
+        bind_capture.h/.cpp       ✅ PURE: BindCapture (release wait, next key, Esc clears / cancels, timeout)
       settings/
         settings.h                ✅ Settings { overlay, general (team mode), esp, aimbot, triggerbot, radar,
-                                     bomb_timer, spectators } + enums
+                                     bomb_timer, spectators, keybinds } + enums
         profile_json.h/.cpp       🔲 [8]
         profile_store.h/.cpp      🔲 [8]
         presets.h/.cpp            🔲 [8]
@@ -374,27 +377,32 @@ cs2-external/
                                      imgui_message_hook
         logo_pixels.h             ✅ GENERATED (tools/make_logo_header.py): the logo as 128x128 RGBA pixels
         overlay_window.h/.cpp     ✅ transparent, click-through, topmost window + own D3D11 device/swap chain; covers the
-                                     game's client rect; INSERT hotkey; set_interactive (click-through off/on)
+                                     game's client rect; the menu hotkey (the bound key); raw input (keyboard +
+                                     mouse, background) → take_presses; set_interactive
         theme.h/.cpp              ✅ dark navy palette (AC's), apply_theme, scaled()
         widgets.h/.cpp            ✅ page_header, card, hint, help_marker, info_row, notice, pill, planned_card,
                                      image_rounded
         menu.h/.cpp               ✅ header (logo, title, pills) + grouped sidebar + current page
         hud.h/.cpp                ✅ watermark (logo + active features) + frame outline, background draw list
+        keybind_widgets.h/.cpp    ✅ key_button (capture, conflict colours), mode_selector, bind_row
         pages/                    ✅ pages.h + one file per page: home (logo, live status, map/players/you), esp (every
                                      ESP option, colour pickers), aimbot and triggerbot (every option + live status),
                                      settings (overlay switches), misc (radar + radar colours, bomb timer, spectator
-                                     list); controls.h/.cpp: shared check,
-                                     colour, combo, key_combo, team_mode_combo, max_distance_slider
+                                     list), keybinds (every action by category, conflicts, reset); bind rows on the
+                                     feature pages; controls.h/.cpp: shared check, colour, combo, team_mode_combo,
+                                     max_distance_slider
       color.h                     ✅ Color (RGBA floats): rgb(0xRRGGBB), faded, lerp
       config.h                    ✅ PURE: branding, pointer bounds, page size, process/module names, --diag flag and
-                                     scan limits, menu key, menu sizes, timings; [5+] Range<T> + every setting range
+                                     scan limits, bind capture timeout, menu sizes, timings; [5+] Range<T> + every
+                                     setting range
       app/                        (the orchestrator, from AC: the only place that wires everything together)
         diagnostics.h/.cpp        ✅ the startup offset diagnostic: build, interfaces, signatures, schema, buttons/
                                      globals → console + OffsetReport for the Home page
-        frame.h/.cpp              ✅ app::run: the loop (pump → game window/focus → menu key → snapshot → aimbot
-                                     write → triggerbot attack write → draw → present) and the overlay's teardown
+        frame.h/.cpp              ✅ app::run: the loop (pump → game window/focus → menu key → keybinds (capture,
+                                     engine, panic/exit/on-off) → snapshot → aimbot write → triggerbot attack write →
+                                     draw → present) and the overlay's teardown
         state.h                   ✅ AppState (game info, offset report, settings, active features, aim/trigger
-                                     status, menu open, match status, game snapshot, overlay size/FPS)
+                                     status, menu open, bind capture, match status, game snapshot, overlay size/FPS)
         live_view.h/.cpp          ✅ `--live`: console table (~4 Hz) of globals, view matrix, every player, read time;
                                      redraws in place in a console, plain frames when redirected
   tests/
@@ -428,7 +436,7 @@ cs2-external/
     game/test_visibility.cpp      ✅ slot bits across both halves, read_spotted_by_mask
     features/test_esp.cpp         ✅ box geometry, health colour, team modes, skips, visibility colours, labels, styles
     features/test_aimbot.cpp      ✅ targeting, aim points (bone 7), candidates/filters, priorities, smoothing, FOV circle
-    features/test_triggerbot.cpp  ✅ target filters, block reasons, state machine timings (single/burst/hold), activation
+    features/test_triggerbot.cpp  ✅ target filters, block reasons, state machine timings (single/burst/hold)
     game/test_writes.cpp          ✅ button values, view angle read/normalized write (FakeMemory)
     helpers/fake_game.h           ✅ hand-built snapshots (you at the origin looking along +x)
     features/test_feature_summary.cpp ✅ the watermark's feature line (empty, one, order, all)
@@ -439,14 +447,17 @@ cs2-external/
     game/test_observer.cpp        ✅ read_observer (in-eye, death cam, stale target, bad mode, broken chain), watches_target
     features/test_spectators.cpp  ✅ who counts as a spectator, the dead-local path, panel rows / sides / empty / hidden
     settings/test_settings.cpp    ✅ defaults inside their ranges (ESP, aimbot, triggerbot, radar, bomb timer,
-                                     spectators), bindable keys,
-                                     config::Range
+                                     spectators), keybind defaults, config::Range
     settings/test_profile_json.cpp 🔲 [8]
     settings/test_profile_store.cpp 🔲 [8]
     settings/test_presets.cpp     🔲 [8]
-    input/test_keys.cpp           🔲 [7]
-    input/test_keybinds.cpp       🔲 [7]
-    input/test_bind_capture.cpp   🔲 [7]
+    input/test_keys.cpp           ✅ key table (sorted, unique, no Escape / generic modifiers), names, round trip,
+                                     mouse / modifier / hotkey rules
+    input/test_keybinds.cpp       ✅ registry (order, ids, defaults), modes/keys allowed, engine (priming, press, hold,
+                                     toggle by press count, menu open, capture, unbound), conflicts, key frames
+    input/test_bind_capture.cpp   ✅ release wait, lowest key, Escape clears, menu key rules, cancel/move/timeout
+    input/test_key_tracker.cpp    ✅ raw keyboard → VK (L/R modifiers, fake keys), auto-repeat, several taps per frame,
+                                     mouse button flags, saturation
     test_color.cpp                ✅ rgb, lerp, faded
 ```
 
@@ -488,7 +499,7 @@ cs2-external/
 ```
 main loop (60+ Hz, or vsync-limited):
   1. pump Win32 messages for the overlay window
-  2. keybinds: GetAsyncKeyState → engine → ActionStates
+  2. keybinds: held keys (GetAsyncKeyState) + press counts (raw input, pumped in 1) → engine → ActionStates
   3. read:    game/ → GameState {local PlayerSnapshot, players, view matrix, globals} (copies)
               (all reads go through core::Memory; the real one is ProcessMemory, __try/__except-guarded)
   4. features (pure): aimbot → angles (write via WriteProcessMemory) · esp → primitives
@@ -510,7 +521,8 @@ main loop (60+ Hz, or vsync-limited):
 to shut down safely.**
 
 ### 6.5 Settings and keybinds (same design as AC)
-- One `Settings` root (pure structs): `general`, `aimbot`, `triggerbot`, `esp`, `player`, `keybinds`.
+- One `Settings` root (pure structs): `overlay`, `general`, `esp`, `aimbot`, `triggerbot`, `radar`, `bomb_timer`,
+  `spectators`, `keybinds`.
 - Numeric ranges defined once (`config.h`) and used by the UI sliders and the JSON clamping.
 - Colours stored as RGBA floats in memory, `"#RRGGBBAA"` in JSON.
 - Profiles live in `profiles\` next to the exe; `default` is built in.
@@ -781,6 +793,17 @@ Rules:
   (mode, target pawn), only for dead players. Bots watch their killer after a ~5 s death cam, so it fills in
   round-based modes (Casual / Competitive), hardly in Deathmatch. `--live` shows whom each dead player watches.
   `--diag`: 67 checks in a match.
+- **Phase 7 (done, verified in-game by the user 2026-10-07):** every key is a **keybind**. Menu → Keybinds lists every
+  action by category (General: menu INSERT, panic END, exit DELETE; Aimbot: aim key Mouse 1 hold, on/off; Triggerbot:
+  trigger key Mouse 4 hold, on/off; ESP on/off; Misc: radar / bomb timer / spectator list on/off; the on/off keys are
+  unbound by default). Click a key button, press any key or mouse button (Mouse 1: click outside the menu), Esc clears
+  it, clicking again cancels, 6 s timeout. Hold / Toggle for the aim and trigger keys. A key on several actions turns
+  red with a tooltip, and the page lists the conflicts. Each feature page has its own bind rows. The menu key can be
+  any keyboard key that isn't a modifier (it stays a `RegisterHotKey`) and can't be cleared. Panic turns every feature
+  off and closes the menu; exit closes the tool cleanly. While the menu is open only the menu key, panic and exit work.
+  The triggerbot's activation is Always / Trigger key. Binds aren't saved yet (Phase 8). After the user's first
+  check (on/off keys needed holding, spamming lost presses): presses now come from **raw input**, so every press
+  counts however slow the overlay's frames are; each press flips an on/off key or a toggle once.
 
 ---
 
@@ -930,8 +953,13 @@ Rules:
 - **Opening the menu must take focus**, otherwise the game keeps the mouse (hidden, relative) and still shoots/turns.
   `SetForegroundWindow` from a background process is normally refused. It works here because the menu key is a
   `RegisterHotKey`: receiving `WM_HOTKEY` counts as user input to our process. If it ever fails, the Home page and
-  the console say to click the menu once. Phase 7's `GetAsyncKeyState` polling must keep a hotkey (or another input
-  path) for this, or the focus grab breaks.
+  the console say to click the menu once. That's why the menu key stays a hotkey after Phase 7 (it's not an engine
+  action): the other keybinds are polled with `GetAsyncKeyState`, which isn't input to our process.
+- **The menu key can only be a keyboard key that isn't a modifier, and never unbound.** `RegisterHotKey` takes no
+  mouse buttons and Shift/Ctrl/Alt alone; an unbound menu key would leave no way to open the menu.
+  `input::key_allowed` and the capture enforce it. A key another program (or Windows: F12) holds fails to register:
+  logged once, shown on the Keybinds page. While a capture runs the hotkey is released, so the menu key can be
+  captured like any key.
 - **The hotkey swallows the key system-wide while registered**, so it is registered only while CS2 or the overlay
   has focus.
 - **`LONG_PTR` style masks:** `~` on a `DWORD` style mask zero-extends when widened and clears the high bits.
@@ -941,6 +969,26 @@ Rules:
 - **While the menu is open, the game runs unfocused**, so CS2's `engine_no_focus_sleep` drops the game's FPS. Normal.
 - **ImGui 1.92.8+: `ImDrawList::AddRect(min, max, col, rounding, thickness, flags)`.** The old `flags, thickness`
   order is `= delete`d under `IMGUI_DISABLE_OBSOLETE_FUNCTIONS` (C2280). Same for `AddPolyline` and `PathStroke`.
+
+### Keybinds
+- **Never derive presses from once-per-frame polling.** While the game takes the GPU, the overlay's frames get slow
+  (with the menu open the game sleeps, so it looked fine there); a tap between two polls was lost, and on/off keys
+  "had to be held". Presses come from raw input (`WM_INPUT`, `RIDEV_INPUTSINK`, counted by `input::KeyTracker`); the
+  held state still comes from `GetAsyncKeyState`. Never merge both press sources: a press seen by polling in one frame
+  and by raw input in the next would count twice and undo a toggle. Polling edges are only the fallback when raw
+  input can't be registered.
+- **Take the raw presses every frame, also while hidden**, so presses typed in other programs are dropped instead of
+  firing when the game comes back. The hidden wait excludes `QS_RAWINPUT` (mouse moves would wake it constantly).
+- **Raw input counts a "down" for a key that's already down as auto-repeat**, not a press. Shift/Ctrl/Alt arrive as
+  the generic VK: right Shift by scan code `0x36`, right Ctrl/Alt by `RI_KEY_E0`.
+- **The frame a capture ends counts as `Suspension::capture`.** Otherwise the captured key's own press would fire its
+  new action on the same frame (bind panic to F → instant panic).
+- **Mouse 1 over the menu isn't captured** (`io.WantCaptureMouse`): a click there is a click. Otherwise the key
+  button's own release click restarts the capture after Mouse 1 is bound. Mouse 1 is bound by clicking outside the
+  menu (the overlay takes those clicks while the menu is open, so the game never gets them).
+- **Toggle keys survive Alt+Tab** (not polled = no edge); hold keys read released. Panic turns every toggle off.
+- **Generic Shift/Ctrl/Alt aren't bindable**: they read "down" together with the L/R keys, so a capture would pick
+  the generic one. Use LSHIFT etc.
 
 ### Tests (doctest)
 - **Define `DOCTEST_CONFIG_USE_STD_HEADERS`** (set in `tests.vcxproj`).
@@ -1175,15 +1223,19 @@ One feature at a time, each with its own in-game check by the user (and its own 
 the game isn't focused; tests pass.
 
 ### Phase 7: Keybind engine
-- [ ] `input/keys`, `input/actions` (registry + defaults), `input/keybinds` (HOLD/TOGGLE/PRESS), tested
-- [ ] `input/bind_capture` (pure, tested)
-- [ ] `input/key_poll` on the main thread; act only while the game is focused; suspended during capture
-- [ ] Keybinds page: every action by category, click to capture, mode selector, conflict highlight; bind buttons
+- [x] `input/keys`, `input/actions` (registry + defaults), `input/keybinds` (HOLD/TOGGLE/PRESS), tested
+- [x] `input/bind_capture` (pure, tested)
+- [x] `input/key_poll` on the main thread; act only while the game (or the overlay) is focused; suspended during
+      capture
+- [x] Keybinds page: every action by category, click to capture, mode selector, conflict highlight; bind buttons
       on each page
-- [ ] Actions: menu toggle (INSERT), panic, exit, aimbot (HOLD/TOGGLE), aimbot enable, ESP toggle, triggerbot
-      (HOLD/TOGGLE), presets
-- [ ] Builds with zero warnings (Debug + Release); tests pass
-- [ ] Verified in-game by the user
+- [x] Actions: menu toggle (INSERT, still the overlay's hotkey), panic (END), exit (DELETE), aimbot (HOLD/TOGGLE),
+      aimbot enable, ESP toggle, triggerbot (HOLD/TOGGLE) + enable, radar / bomb timer / spectator list toggles.
+      Presets move to Phase 8 (they don't exist yet). Panic and exit have their basic behaviour now; Phase 9 adds the
+      exit button and the robustness pass
+- [x] Builds with zero warnings (Debug + Release); tests 191/191
+- [x] Verified in-game by the user (2026-10-07): every keybind works; after the raw input fix the on/off keys flip on
+      each tap, spamming included; approved
 
 **Acceptance:** each mode works with keyboard keys and mouse buttons (incl. MOUSE4/5); capturing a bind doesn't
 fire it; conflicts are shown; rebinding the menu key works; tests pass.
@@ -1337,7 +1389,13 @@ against the map's collision geometry, read from the game files (not from game me
 - **Hitsound dropped (2026-10-07, user decision):** removed from the plan, the Misc page's "Coming next" card and
   `features::ActiveFeatures`. **Phase 6 is done.**
 
-**Next:** Phase 7, keybind engine.
+- **Phase 7: done, verified in-game by the user (2026-10-07), approved, committed and pushed.** The user's first check: every
+  keybind works, but on/off keys needed holding and spamming lost presses (taps between two once-per-frame polls).
+  Fixed with raw input press counting (the user chose it over an input thread). Debug + Release zero warnings, tests
+  191/191; raw input registers against the running game, CPU unchanged (~25-35% of a core while the overlay shows,
+  the same before the change). **No offset changed.**
+
+**Next:** Phase 8, settings and profiles (JSON) + presets.
 
 ---
 
@@ -1514,6 +1572,23 @@ against the map's collision geometry, read from the game files (not from game me
 - **2026-10-07 (user decision):** **Hitsound dropped.** Removed from §3, the Phase 6 plan, the Misc page's
   "Coming next" card (the card is gone: nothing else was planned there) and `features::ActiveFeatures`. Phase 6 ends
   with the radar, the bomb timer and the spectator list.
+- **2026-10-07 (Phase 7):** **The menu key stays the overlay's `RegisterHotKey`**, registered with whatever key is
+  bound to `menu_toggle`, not an engine action: the hotkey is what lets the menu take focus. So it must be a keyboard
+  key that isn't a modifier, and it can't be unbound.
+- **2026-10-07 (Phase 7):** **Panic and exit are wired now** (the Phase 7 action list names them): panic = every
+  feature's Enabled off, toggle keys off, attack released, menu closed; exit = the existing clean shutdown. Phase 9
+  keeps the exit button and the robustness review. **Preset actions wait for Phase 8**, when presets exist.
+- **2026-10-07 (Phase 7):** `BindMode` moved from `settings` to `input/actions` (+ `press`). The aim key, trigger key
+  and modes live in `settings::KeybindSettings`; `TriggerActivation` became always / key. `features::KeyActivation`
+  is gone (the engine does it). Toggle keys now **keep their state over Alt+Tab** (Phase 5 reset them on focus loss).
+- **2026-10-07 (Phase 7):** On/off keys for the radar, bomb timer and spectator list were added too (unbound by
+  default): the registry makes each one a single line. Key names: AC's (`INSERT`, `LSHIFT`, `F5`) but `Mouse 1`-`5`
+  for the mouse, as the UI showed before.
+- **2026-10-07 (Phase 7, user choice):** **Presses come from raw input** (`RegisterRawInputDevices`, keyboard + mouse,
+  `RIDEV_INPUTSINK` on the overlay window), not from once-per-frame polling, which lost taps while the overlay's
+  frames were slow. Chosen by the user over a polling thread (would break the one-thread rule) and GetAsyncKeyState's
+  "pressed since last call" bit (documented as unreliable). Raw input is not a hook (§1): nothing runs in or changes
+  the game, Windows only reports input it delivers anyway. Two presses in one frame flip a toggle twice.
 - **2026-10-06 (Phase 3):** Weapons are named from the **item definition index** (table in `game/weapon.cpp`), not the
   designer name, because some weapons share a designer name (USP-S / P2000). Each also gets a `WeaponClass` for the
   Phase 5 triggerbot filter.
