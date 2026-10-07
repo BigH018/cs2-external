@@ -111,8 +111,9 @@ overlay menu, running **only** under `-insecure` against bots.
 The goal is a learning project, not parity with any public cheat and not a release. Feature targets, in order of
 implementation:
 
-- **Overlay menu** toggled with **INSERT**: a Home dashboard and sidebar pages (**ESP, Aimbot, Triggerbot, Misc,
-  Settings**). Help in (?) tooltips, adjustable menu size, settings applied live.
+- **Overlay menu** toggled with **INSERT**: a Home dashboard and top tabs with icons (**Aimbot, Triggerbot, ESP, Misc,
+  Keybinds, Settings**; a sidebar until Phase 10). Help in (?) tooltips, five themes + an accent colour, resizable by
+  dragging its corner, settings applied live.
 - **ESP** drawn in the overlay: 2D box, corner box, head circle, approximate skeleton (Phase 4+, needs bones),
   name, health bar/number, distance, weapon name, **scoped indicator** (the bot is zoomed in with an AWP, SSG 08,
   SCAR-20, G3SG1, AUG or SG 553), **visible / hidden colours** (spotted-by heuristic), snaplines (origin choice),
@@ -249,7 +250,8 @@ Status markers: ✅ exists, 🔲 planned (phase number in brackets).
 ```
 cs2-external/
   CLAUDE.md                       ✅ this file: project memory and rules
-  README.md                       ✅ stub (full educational README in [11])
+  README.md                       ✅ the educational README (Phase 11): screenshots, features, build/run/use,
+                                     troubleshooting, tests, layout, "How it works" in 20 sections, credits
   .gitignore                      ✅ VS/C++ build output, .vs, local profiles/logs
   .gitattributes                  ✅ CRLF for VS files, text normalisation
   cs2-external.sln                ✅ solution: Debug|x64, Release|x64 (external, tests, vendor)
@@ -264,6 +266,8 @@ cs2-external/
   docs/
     DEVLOG.md                     ✅ dated log
     offsets.md                    ✅ running notes on every offset, signature, schema field, with proof
+    screenshots/                  ✅ the README's pictures (Phase 11): 2 in-game ESP shots, the menu over the game,
+                                     7 menu pages + the Violet theme (cropped PNGs), watermark + radar crops
     dumps/
       info.json                   ✅ a2x/cs2-dumper run info: CS2 build 14189, 2026-10-06T16:04:45Z
       offsets.json                ✅ a2x/cs2-dumper output (module globals, 29 entries)
@@ -753,7 +757,7 @@ Rules:
   `engine2.dll` bases and sizes, and the local pawn pointer (`client.dll + dwLocalPlayerPawn`), then waits for Enter.
   Game closed → `cs2.exe not found` (exit 1). Access denied → tells the user to run as administrator. In the main
   menu the pawn prints as `none`; a non-plausible value prints a "dwLocalPlayerPawn may be stale" warning.
-- **Phase 1 (built 2026-10-06, in-game check pending):** after the Phase 0 printout the tool keeps running and puts
+- **Phase 1 (done, verified in-game by the user 2026-10-06):** after the Phase 0 printout the tool keeps running and puts
   its own transparent, topmost, click-through window over CS2's client area (it follows the game window). A watermark
   sits in the top-left corner: logo + "External Cheat by BigH", and under it the active features one per line
   (`No features on` until Phase 4). INSERT opens the menu (header: logo, name, an "External" pill; sidebar: Home / Aimbot / Triggerbot / ESP / Misc /
@@ -858,6 +862,12 @@ Rules:
   dark themes as preview tiles: Midnight (default, black/grey/off-white), Black, Graphite, Violet, Ice; an accent
   colour picker; "Use the theme's accent"), Overlay (watermark, frame outline), Exit. The theme and accent are saved
   in profiles (`overlay.theme`, `overlay.accent`); old profiles load with the defaults. The watermark follows the theme.
+- **Phase 11 (done, approved by the user 2026-10-07):** no code change. `README.md` is the full educational
+  README, in the AC project's style: header, screenshots (in-game ESP, the menu over the live game, every page),
+  features + what external can't do, requirements / build / run / menu / hotkeys / presets / profiles / console,
+  troubleshooting, tests, layout, "How it works" (20 sections: handle, `core::Memory`, offsets, signatures,
+  `CreateInterface`, schema, entity system, players and bones, projection, overlay, spotted-by, aimbot, triggerbot,
+  misc, keybinds, safety, the frame, after an update, lessons per phase), credits. Pictures in `docs/screenshots/`.
 
 ---
 
@@ -1063,6 +1073,13 @@ Rules:
   title, after a button). On a plain text line they'd sit low.
 - **`widgets::Columns` isn't nestable** (it's an ImGui table); close it (scope) before full-width content under it.
 - **Segmented buttons are equally wide**: size them for the longest name (`bind_row` does), or text gets clipped.
+- **Screenshots of the real menu over the game** (Phase 11, with the user's OK to use the game): bring CS2 to the front
+  from a script (an Alt tap with `keybd_event`, then `SetForegroundWindow`; a background process is refused without
+  it), start the tool with `-NoNewWindow`, then a synthetic INSERT (`keybd_event`) fires the `RegisterHotKey` and the
+  menu opens and takes focus; tab clicks with `SetCursorPos` + `mouse_event` only while the menu is open (a click with
+  the menu closed would shoot in the game). Run a **copy** of the exe from its own folder (`bin\Showcase`, git-ignored,
+  deleted afterwards) so the screenshot profiles never touch the user's `bin\Release\profiles`; the Settings page shows
+  that folder. A view turn for a different angle is a `dwViewAngles` write: note the old angles and write them back.
 - **Checking the menu without the game's focus:** the menu only opens with the menu key, so screenshots of the real
   menu come from a scratch harness (outside the repo) that compiles `src/external` (minus `app/` and `main.cpp`) with
   `cl`, renders `ui::draw_menu` with a mock `AppState` into an offscreen D3D11 texture and saves a BMP per page.
@@ -1363,14 +1380,17 @@ cursor problem; after exit the game behaves exactly like an untouched game.
 - [x] Verified in-game by the user (2026-10-07): "so much better, so clean"; approved
 
 ### Phase 11: Educational README
-- [ ] A comprehensive, educational `README.md`: what the project is (and isn't: §1), features, how it works
+- [x] A comprehensive, educational `README.md`: what the project is (and isn't: §1), features, how it works
       (process handle, RPM/WPM, entity system walk, handle resolution, schema lookups, signature scanning,
-      world-to-screen, overlay window), how offsets and signatures were found (the dumpers, Cheat Engine,
-      IDA/Ghidra), safety (guarded reads, shutdown), build and use (keys, presets, profiles), project layout,
-      tests, and what was learned per phase
-- [ ] Final pass on this file
-- [ ] Builds with zero warnings (Debug + Release); tests pass
-- [ ] Reviewed by the user
+      world-to-screen, overlay window), how offsets and signatures were found (the dumper, signatures built from the
+      live module, read-only scripts against the live game; no Cheat Engine or IDA/Ghidra was used, so the README
+      says so honestly), safety (guarded reads, shutdown), build and use (keys, presets, profiles), project layout,
+      tests, and what was learned per phase. Drafted in the AC README's style (the user's request)
+- [x] Screenshots (the user's request): in-game ESP ×2, the menu opened over the live game, every page, the Violet
+      theme, watermark + radar crops (`docs/screenshots/`)
+- [x] Final pass on this file
+- [x] Builds with zero warnings (Debug + Release); tests 220/220
+- [x] Reviewed by the user (2026-10-07): approved ("push it")
 
 **Acceptance:** someone who has never seen the project can understand what it does, how each technique works and
 why, build it and use it, from the README alone.
@@ -1498,7 +1518,16 @@ against the map's collision geometry, read from the game files (not from game me
   Release zero warnings, tests 220/220; every page rendered offscreen with mock data (scratch harness) and checked in
   four themes and a narrow window; the overlay starts against the running game. **No offset changed.**
 
-**Next:** Phase 11, educational README.
+- **Phase 11: done, approved by the user (2026-10-07), committed and pushed.** `README.md` written in the AC
+  README's style; 13 pictures in `docs/screenshots/`, all from the live game (build 14189, de_mirage Deathmatch, bots
+  frozen): the tool ran from a scratch copy with two screenshot profiles, the menu was opened with a synthetic INSERT
+  and the tabs clicked by script; one view-angle write for the second ESP shot, restored afterwards. Debug + Release
+  zero warnings, tests 220/220, `--diag` 67/67. **No offset changed, no code changed.** Not pictured: the bomb timer
+  (no bomb in Deathmatch), a spectator (bots respawn at once in Deathmatch), an enemy in the visible colour (every
+  enemy was behind cover).
+
+**Next:** the main roadmap is done; open items are the "Later"
+section (own ray cast visibility) and the recurring after-update checklist.
 
 ---
 
@@ -1720,6 +1749,12 @@ against the map's collision geometry, read from the game files (not from game me
 - **2026-10-07 (Phase 10):** Themes are **pure data in `settings/themes`** (so the default accent in `settings.h` and the
   palette come from one table, and contrast is unit-tested); `ui/theme` turns them into ImGui colours. Theme and accent
   live in the existing `overlay` profile section (two new keys, no schema bump: missing keys keep their defaults).
+- **2026-10-07 (Phase 11, user request):** The README follows the **AC project's README** structure (centred header,
+  screenshots first, features, use, troubleshooting, tests, layout, a numbered "How it works", lessons per phase,
+  credits) and **its pictures come from the live game**, not the offscreen harness: the user left CS2 open near bots
+  for it. The README says plainly what external can't do and that no Cheat Engine / IDA was used (the roadmap item
+  had listed them as possible sources). Images: in-game shots as JPEG (~400 KiB), menu pages as cropped PNG
+  (~70 KiB).
 - **2026-10-06 (Phase 3):** Weapons are named from the **item definition index** (table in `game/weapon.cpp`), not the
   designer name, because some weapons share a designer name (USP-S / P2000). Each also gets a `WeaponClass` for the
   Phase 5 triggerbot filter.

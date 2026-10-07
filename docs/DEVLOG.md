@@ -631,3 +631,46 @@ user's existing profile loads with 0 warnings (no theme keys: defaults).
 live, the close button.
 
 **User (2026-10-07):** "so much better, so clean"; approved for commit. Phase 10 done.
+
+## 2026-10-07: Phase 11, educational README
+
+The user asked for the README to be drafted like the AC project's (`BigH018/internal-assault-cube`) and to include
+pictures of the tool and in-game screenshots; they left CS2 open (de_mirage Deathmatch, frozen bots) near players for it.
+
+**Built**
+- `README.md`, in the AC README's structure: centred header with the logo, a scope note, screenshots, contents,
+  features (plus a table of what an external tool can't do), requirements, build, run (`--diag`, `--live`), the menu
+  page by page, default hotkeys, presets with their values, profiles, the console (real `--diag` and `--live` output),
+  troubleshooting, tests, project layout, then **How it works** in 20 sections (external vs internal, the handle,
+  `core::Memory`, where offsets come from, signature scanning, `CreateInterface` decoded, the schema system's
+  self-pointing class infos, the chunked entity system and handles, players / weapons / bones, world-to-screen, the
+  overlay window, the spotted-by mask and its measured delay, aimbot smoothing, the triggerbot's button writes, the
+  read-only misc features and the bomb timer's "never guess" lesson, keybinds and raw input, safety, the frame loop,
+  what to do after a CS2 update, lessons per phase), and credits.
+- `docs/screenshots/` (13 files): `esp-full.jpg`, `esp-corners.jpg`, `menu-in-game.jpg` (1920x1080 JPEG, ~400 KiB),
+  `menu-{home,aimbot,triggerbot,esp,misc,keybinds,settings,settings-violet}.png` (the menu window cropped, 901x621,
+  ~70 KiB), `hud-watermark.png`, `hud-radar.png`.
+
+**How the pictures were taken** (scratch scripts, not in the repo)
+- A copy of the Release exe in `bin\Showcase` (git-ignored, deleted afterwards) with two profiles, "showcase" (full
+  ESP with teammates, aimbot FOV circle, triggerbot on its key, radar with names, bomb timer, spectators) and
+  "corners" (corner boxes, snaplines, enemies only). The user's `bin\Release\profiles` were never touched.
+- CS2 brought to the front from a script (Alt tap + `SetForegroundWindow`), the tool started with `-NoNewWindow`, the
+  screen grabbed with Pillow. The menu opened with a synthetic INSERT (the real `RegisterHotKey` path) and the tabs
+  were clicked by script, only while the menu was open. The Violet tile was clicked live for one shot (not saved).
+- The second ESP shot needed another angle: one `dwViewAngles` write (pitch 4.69 / yaw 53.44 → 4 / 75), written back
+  afterwards and read again to confirm (4.6886 / 53.4423).
+- Every run exited with the exit key (DELETE): "Exit key: exiting", ImGui shut down, overlay removed.
+
+**Problems and fixes**
+- The first menu shots came from a scratch folder in Temp: the Settings page showed that long path and "readme_*"
+  profile names. Re-shot from `bin\Showcase` with cleaner names.
+- The radar crop cut off names drawn past the radar's left edge; widened.
+- A `|` inside a code span broke a README table row; rewritten.
+
+**Verified here:** Debug and Release zero warnings; tests 220/220 in both (3908 assertions); `--diag` all 67 checks OK
+during the screenshot runs; every relative link and image in the README exists. **No code or offset changed.**
+**Not pictured:** the bomb timer (no bomb in Deathmatch), a spectator (bots respawn at once), an enemy in the visible
+colour (every enemy was behind cover; teammates show visible / hidden instead).
+
+**User (2026-10-07):** approved ("push it"). Phase 11 done.
