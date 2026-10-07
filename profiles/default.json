@@ -1,6 +1,8 @@
 {
   "schema_version": 1,
   "overlay": {
+    "theme": "midnight",
+    "accent": "#D2D2D8FF",
     "watermark": true,
     "frame_outline": false
   },

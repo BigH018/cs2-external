@@ -16,6 +16,8 @@ settings::Settings customised()
 {
     settings::Settings s;
     s.overlay.watermark = false;
+    s.overlay.theme = settings::MenuTheme::ice;
+    s.overlay.accent = Color::rgba(0x11AA22FF);
     s.general.team_mode = settings::TeamMode::free_for_all;
     s.esp.show_teammates = true;
     s.esp.max_distance = 50.0f;

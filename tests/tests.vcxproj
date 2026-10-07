@@ -100,6 +100,7 @@
     <ClCompile Include="settings\test_profile_json.cpp" />
     <ClCompile Include="settings\test_profile_store.cpp" />
     <ClCompile Include="settings\test_presets.cpp" />
+    <ClCompile Include="settings\test_themes.cpp" />
     <ClCompile Include="input\test_keys.cpp" />
     <ClCompile Include="input\test_keybinds.cpp" />
     <ClCompile Include="input\test_bind_capture.cpp" />
@@ -145,6 +146,7 @@
     <ClCompile Include="..\src\external\settings\presets.cpp" />
     <ClCompile Include="..\src\external\settings\profile_json.cpp" />
     <ClCompile Include="..\src\external\settings\profile_store.cpp" />
+    <ClCompile Include="..\src\external\settings\themes.cpp" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

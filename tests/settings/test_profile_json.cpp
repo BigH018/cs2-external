@@ -54,6 +54,8 @@ TEST_CASE("profile json: the defaults round-trip with no warnings")
 TEST_CASE("profile json: a fully customised profile round-trips exactly")
 {
     settings::Settings s;
+    s.overlay.theme = settings::MenuTheme::violet;
+    s.overlay.accent = Color::rgba(0x4080C0FF);
     s.overlay.watermark = false;
     s.overlay.frame_outline = true;
     s.general.team_mode = settings::TeamMode::free_for_all;

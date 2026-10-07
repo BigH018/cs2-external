@@ -9,12 +9,15 @@
 
 #include "color.h"
 #include "input/actions.h"
+#include "settings/themes.h"
 
 namespace settings
 {
-// The overlay itself (moved here from app::OverlayOptions in Phase 4).
+// The overlay itself (moved here from app::OverlayOptions in Phase 4): the menu's look, the watermark.
 struct OverlaySettings
 {
+    MenuTheme theme = MenuTheme::midnight;                    // the menu's and the watermark's colours
+    Color accent = theme_colours(MenuTheme::midnight).accent; // switches, the selected tab, sliders
     bool watermark = true;      // logo, "External Cheat by BigH" and the active features, top-left
     bool frame_outline = false; // a thin outline along the overlay's edges, to check that it covers the game exactly
 

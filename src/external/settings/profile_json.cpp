@@ -42,6 +42,7 @@ constexpr std::array<std::string_view, 3> kFireModes = {"single", "burst", "hold
 constexpr std::array<std::string_view, 4> kRadarCorners = {"top_left", "top_right", "bottom_left", "bottom_right"};
 constexpr std::array<std::string_view, 2> kPanelSides = {"left", "right"};
 constexpr std::array<std::string_view, 3> kBindModes = {"hold", "toggle", "press"}; // input::BindMode order
+constexpr std::array<std::string_view, 5> kThemes = {"midnight", "black", "graphite", "violet", "ice"};
 
 static_assert(static_cast<std::size_t>(BoxStyle::corners) == kBoxStyles.size() - 1);
 static_assert(static_cast<std::size_t>(SnaplineOrigin::top) == kSnaplineOrigins.size() - 1);
@@ -50,6 +51,7 @@ static_assert(static_cast<std::size_t>(AimPriority::lowest_health) == kAimPriori
 static_assert(static_cast<std::size_t>(FireMode::hold) == kFireModes.size() - 1);
 static_assert(static_cast<std::size_t>(RadarCorner::bottom_right) == kRadarCorners.size() - 1);
 static_assert(static_cast<std::size_t>(input::BindMode::press) == kBindModes.size() - 1);
+static_assert(kMenuThemes.size() == kThemes.size() && static_cast<std::size_t>(MenuTheme::ice) == kThemes.size() - 1);
 
 // --- colours ------------------------------------------------------------------------------------------------------
 
@@ -307,6 +309,8 @@ private:
 template <class V, class S>
 void visit_overlay(V& v, S& s)
 {
+    v.choice("theme", s.theme, kThemes);
+    v.colour("accent", s.accent);
     v.boolean("watermark", s.watermark);
     v.boolean("frame_outline", s.frame_outline);
 }
