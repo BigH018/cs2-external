@@ -275,9 +275,10 @@ cs2-external/
     vendor.vcxproj                ✅ static lib (vendor.lib) compiling Dear ImGui, warnings off
     imgui/                        ✅ Dear ImGui v1.92.9b core + Win32 + DX11 backends (15 files, hashes in README)
     doctest/                      ✅ doctest v2.5.3 (doctest.h + LICENSE.txt)
-    nlohmann/                     🔲 [8] nlohmann/json v3.12.0
+    nlohmann/                     ✅ nlohmann/json v3.12.0 (json.hpp + LICENSE.MIT, hashes in README)
   profiles/
-    default.json                  🔲 [8] mirror of built-in defaults
+    default.json                  ✅ mirror of the built-in "default" (= code defaults, tested); user profiles live
+                                     next to the exe (bin\<Config>\profiles\), git-ignored
   src/
     external/
       external.vcxproj            ✅ console exe → bin\<Config>\cs2_external.exe, x64, static CRT
@@ -359,7 +360,8 @@ cs2-external/
         keys.h/.cpp               ✅ PURE: every bindable VK ↔ name (Mouse 1-5, letters, digits, F1-F24, numpad, L/R
                                      modifiers...), KeySet, vk_from_name, is_mouse_button, is_modifier, can_be_hotkey
         actions.h/.cpp            ✅ PURE: BindMode, Bind, ActionId registry (constexpr, id order) + defaults,
-                                     categories, allowed modes, key_allowed (the menu key: keyboard, never unbound)
+                                     categories (+ Presets), allowed modes, key_allowed (the menu key: keyboard, never
+                                     unbound); ActionDef::key is the profile id
         keybinds.h/.cpp           ✅ PURE: KeyFrame (held + press counts), KeybindEngine (HOLD/TOGGLE/PRESS by press
                                      count, priming, suspension), presses_from_edges (fallback), find_conflicts
         key_poll.h/.cpp           ✅ GetAsyncKeyState polling (poll_keys, is_key_down): the held keys
@@ -368,10 +370,12 @@ cs2-external/
         bind_capture.h/.cpp       ✅ PURE: BindCapture (release wait, next key, Esc clears / cancels, timeout)
       settings/
         settings.h                ✅ Settings { overlay, general (team mode), esp, aimbot, triggerbot, radar,
-                                     bomb_timer, spectators, keybinds } + enums
-        profile_json.h/.cpp       🔲 [8]
-        profile_store.h/.cpp      🔲 [8]
-        presets.h/.cpp            🔲 [8]
+                                     bomb_timer, spectators, keybinds } + enums; every struct has a defaulted ==
+        profile_json.h/.cpp       ✅ PURE: Settings <-> JSON text: one field list per section (nested: colours,
+                                     weapons) for write + read; forgiving load (warnings, clamping), schema_version
+        profile_store.h/.cpp      ✅ ProfileStore(folder): clean_name, list ("default" first), load / save (atomic:
+                                     .tmp + replace) / rename / remove, .last_profile, load_startup (std::filesystem)
+        presets.h/.cpp            ✅ PURE: Preset Off/Chill/Medium/Rage + apply_preset (features and strengths only)
       ui/
         imgui_layer.h/.cpp        ✅ ImGuiLayer: context, fonts, logo texture, Win32 + DX11 backends;
                                      imgui_message_hook
@@ -382,27 +386,30 @@ cs2-external/
         theme.h/.cpp              ✅ dark navy palette (AC's), apply_theme, scaled()
         widgets.h/.cpp            ✅ page_header, card, hint, help_marker, info_row, notice, pill, planned_card,
                                      image_rounded
-        menu.h/.cpp               ✅ header (logo, title, pills) + grouped sidebar + current page
+        menu.h/.cpp               ✅ header (logo, title, pills) + grouped sidebar + current page; MenuState (page,
+                                     the Profiles card's selection / name box / delete confirmation)
         hud.h/.cpp                ✅ watermark (logo + active features) + frame outline, background draw list
         keybind_widgets.h/.cpp    ✅ key_button (capture, conflict colours), mode_selector, bind_row
         pages/                    ✅ pages.h + one file per page: home (logo, live status, map/players/you), esp (every
                                      ESP option, colour pickers), aimbot and triggerbot (every option + live status),
-                                     settings (overlay switches), misc (radar + radar colours, bomb timer, spectator
+                                     settings (Profiles, Presets, overlay switches), misc (radar + radar colours, bomb timer, spectator
                                      list), keybinds (every action by category, conflicts, reset); bind rows on the
                                      feature pages; controls.h/.cpp: shared check, colour, combo, team_mode_combo,
                                      max_distance_slider
-      color.h                     ✅ Color (RGBA floats): rgb(0xRRGGBB), faded, lerp
+      color.h                     ✅ Color (RGBA floats): rgb(0xRRGGBB), rgba(0xRRGGBBAA) / to_rgba, faded, lerp
       config.h                    ✅ PURE: branding, pointer bounds, page size, process/module names, --diag flag and
                                      scan limits, bind capture timeout, menu sizes, timings; [5+] Range<T> + every
                                      setting range
       app/                        (the orchestrator, from AC: the only place that wires everything together)
         diagnostics.h/.cpp        ✅ the startup offset diagnostic: build, interfaces, signatures, schema, buttons/
                                      globals → console + OffsetReport for the Home page
-        frame.h/.cpp              ✅ app::run: the loop (pump → game window/focus → menu key → keybinds (capture,
-                                     engine, panic/exit/on-off) → snapshot → aimbot write → triggerbot attack write →
-                                     draw → present) and the overlay's teardown
-        state.h                   ✅ AppState (game info, offset report, settings, active features, aim/trigger
-                                     status, menu open, bind capture, match status, game snapshot, overlay size/FPS)
+        frame.h/.cpp              ✅ app::run: loads the last profile, then the loop (pump → game window/focus →
+                                     menu key → keybinds (capture, engine, panic/exit/on-off/presets) → requests
+                                     (profile operations, presets) → snapshot → aimbot write → triggerbot attack write
+                                     → draw → present) and the overlay's teardown
+        state.h                   ✅ AppState (game info, offset report, settings, ProfileState + unsaved_changes,
+                                     Requests (profile op, preset), active features, aim/trigger status, menu open,
+                                     bind capture, match status, game snapshot, overlay size/FPS)
         live_view.h/.cpp          ✅ `--live`: console table (~4 Hz) of globals, view matrix, every player, read time;
                                      redraws in place in a console, plain frames when redirected
   tests/
@@ -448,9 +455,13 @@ cs2-external/
     features/test_spectators.cpp  ✅ who counts as a spectator, the dead-local path, panel rows / sides / empty / hidden
     settings/test_settings.cpp    ✅ defaults inside their ranges (ESP, aimbot, triggerbot, radar, bomb timer,
                                      spectators), keybind defaults, config::Range
-    settings/test_profile_json.cpp 🔲 [8]
-    settings/test_profile_store.cpp 🔲 [8]
-    settings/test_presets.cpp     🔲 [8]
+    settings/test_profile_json.cpp ✅ round trips (defaults, everything customised), format, invalid JSON, missing /
+                                     unknown / wrong-typed / out-of-range values, colours, keybinds, schema version,
+                                     profiles/default.json == code defaults (writes default.json.expected on mismatch)
+    settings/test_profile_store.cpp ✅ names, save/list/load, overwrite, read-only default, missing/broken/warnings,
+                                     rename/delete (+ last marker), last profile + startup fallback (temp folder)
+    settings/test_presets.cpp     ✅ untouched parts (keybinds, colours, team options, distances, positions), ranges,
+                                     Off / Chill / Medium / Rage values
     input/test_keys.cpp           ✅ key table (sorted, unique, no Escape / generic modifiers), names, round trip,
                                      mouse / modifier / hotkey rules
     input/test_keybinds.cpp       ✅ registry (order, ids, defaults), modes/keys allowed, engine (priming, press, hold,
@@ -804,6 +815,16 @@ Rules:
   The triggerbot's activation is Always / Trigger key. Binds aren't saved yet (Phase 8). After the user's first
   check (on/off keys needed holding, spamming lost presses): presses now come from **raw input**, so every press
   counts however slow the overlay's frames are; each press flips an on/off key or a toggle once.
+- **Phase 8 (done, verified in-game by the user 2026-10-07):** every setting and keybind is saved in **profiles**:
+  `profiles\<name>.json` next to `cs2_external.exe` (so `bin\Debug` and `bin\Release` each have their own). On start
+  the last loaded or saved profile loads (console: `Profile "x" loaded (N warnings) from ...`, each warning on its own
+  line); `default` is the built-in defaults and read-only. Menu → Settings → Profiles: the list (loaded one marked,
+  double-click loads), Load, Delete (asks once more), Save, Reset to defaults, a name box with Save as / Rename current,
+  a result line, the loaded profile's problems, the folder. "unsaved changes" shows there and on Home. A hand-edited
+  profile with bad values loads anyway: unknown keys ignored, bad values back to the default, numbers clamped, each a
+  warning. **Presets** (Settings → Presets, or keys in the Keybinds page's Presets category, unbound by default): Off /
+  Chill / Medium / Rage switch the features and their strength, never keybinds, colours, team mode, team checks, max
+  distances or positions; the result is an unsaved change.
 
 ---
 
@@ -989,6 +1010,16 @@ Rules:
 - **Toggle keys survive Alt+Tab** (not polled = no edge); hold keys read released. Panic turns every toggle off.
 - **Generic Shift/Ctrl/Alt aren't bindable**: they read "down" together with the L/R keys, so a capture would pick
   the generic one. Use LSHIFT etc.
+
+### Profiles
+- **A default colour must be byte-exact** (`Color::rgba(0xRRGGBBAA)`, not `rgb(hex, 0.35f)`): profiles store colours as
+  `#RRGGBBAA`, so 0.35 would load back as 89/255 and the defaults wouldn't round-trip (`test_profile_json` checks).
+- **Changing a default means updating `profiles/default.json`**: the test fails and writes `default.json.expected`
+  next to it; review and rename it.
+- **Never rename a setting's JSON key or an `ActionDef::key`**: old profiles would lose that value (with a warning).
+  Rename only with a `schema_version` bump and a migration in `profile_json.cpp`.
+- **Each build config has its own profiles** (`bin\Debug\profiles`, `bin\Release\profiles`).
+- **Loading a profile resets toggle keys and cancels a bind capture** (`settings_replaced` in `app/frame`).
 
 ### Tests (doctest)
 - **Define `DOCTEST_CONFIG_USE_STD_HEADERS`** (set in `tests.vcxproj`).
@@ -1241,17 +1272,17 @@ the game isn't focused; tests pass.
 fire it; conflicts are shown; rebinding the menu key works; tests pass.
 
 ### Phase 8: Settings and profiles (JSON) + presets
-- [ ] Vendor nlohmann/json (after approval)
-- [ ] `settings/profile_json`: one field list per section for write + read; forgiving load, `schema_version` +
+- [x] Vendor nlohmann/json (approved 2026-10-07; v3.12.0, copied from AC, hash checked against the release)
+- [x] `settings/profile_json`: one field list per section for write + read; forgiving load, `schema_version` +
       migration hook (pure, tested)
-- [ ] `settings/profile_store`: `ProfileStore(folder)`, atomic save, read-only `default`, last profile, load on
+- [x] `settings/profile_store`: `ProfileStore(folder)`, atomic save, read-only `default`, last profile, load on
       startup (std::filesystem only, tested on a temp folder)
-- [ ] Settings page: profile list, save / save as / load / rename / delete / reset, unsaved-changes marker
-- [ ] `settings/presets`: Off / Chill / Medium / Rage, feature bundles + strengths, on the Settings page and
-      bindable hotkeys
-- [ ] `profiles/default.json` committed and equal to code defaults (test)
-- [ ] Builds with zero warnings (Debug + Release); tests pass
-- [ ] Verified in-game by the user
+- [x] Settings page: profile list, save / save as / load / rename / delete / reset, unsaved-changes marker (+ Home)
+- [x] `settings/presets`: Off / Chill / Medium / Rage, feature bundles + strengths, on the Settings page and
+      bindable hotkeys (Presets category, unbound by default)
+- [x] `profiles/default.json` committed and equal to code defaults (test)
+- [x] Builds with zero warnings (Debug + Release); tests 216/216
+- [x] Verified in-game by the user (2026-10-07): everything works; approved
 
 **Acceptance:** settings survive restart via the last profile; a hand-edited profile with bad values loads with
 warnings and clamped values; `default` can't be overwritten; each preset switches the right features and leaves
@@ -1395,7 +1426,12 @@ against the map's collision geometry, read from the game files (not from game me
   191/191; raw input registers against the running game, CPU unchanged (~25-35% of a core while the overlay shows,
   the same before the change). **No offset changed.**
 
-**Next:** Phase 8, settings and profiles (JSON) + presets.
+- **Phase 8: done, verified in-game by the user (2026-10-07), approved, committed and pushed.** nlohmann/json v3.12.0 vendored (approved).
+  Debug + Release zero warnings, tests 216/216. Startup profile loading checked against the running game (default,
+  and a hand-broken profile: warnings logged, values clamped, a refused menu key kept INSERT). **No offset changed.**
+  Not checked here: the Settings page and its buttons on screen.
+
+**Next:** Phase 9, panic, clean shutdown, polish.
 
 ---
 
@@ -1589,6 +1625,19 @@ against the map's collision geometry, read from the game files (not from game me
   frames were slow. Chosen by the user over a polling thread (would break the one-thread rule) and GetAsyncKeyState's
   "pressed since last call" bit (documented as unreliable). Raw input is not a hook (§1): nothing runs in or changes
   the game, Windows only reports input it delivers anyway. Two presses in one frame flip a toggle twice.
+- **2026-10-07 (Phase 8, user choices):** **nlohmann/json v3.12.0 vendored** (copied from the AC project's copy, its
+  SHA-256 checked against the official release asset). **Presets** with the proposed values: Off = every feature off;
+  Chill = corner-box ESP, body aimbot FOV 3 / smoothing 12 / visible only, no triggerbot; Medium = full ESP with
+  skeleton and head circle, head aimbot FOV 6 / smoothing 6 / visible only, triggerbot on the key, 80 ms, single;
+  Rage = everything with snaplines, head aimbot FOV 30 / smoothing 1, not visible-only, triggerbot always, 0 ms, hold,
+  no flash/air/scope limits. Chill, Medium and Rage also turn the radar, bomb timer and spectator list on.
+- **2026-10-07 (Phase 8):** Profiles follow the AC design (one field list per section, forgiving load, atomic save,
+  read-only built-in `default`, `.last_profile`) and live **next to the exe**. Profiles save **everything**,
+  keybinds included; presets never change keybinds, colours, team mode, team checks, max distances, the overlay or
+  positions. Profile operations run in `app/frame` at the start of the next frame (the menu only queues them).
+  The profile shows on Home (not in the header: the user wanted the header to keep only the "External" pill).
+- **2026-10-07 (Phase 8):** The three fractional-alpha colour defaults became byte-exact (`Color::rgba`), so the
+  defaults survive `#RRGGBBAA` unchanged; the visible difference is under 0.5 %.
 - **2026-10-06 (Phase 3):** Weapons are named from the **item definition index** (table in `game/weapon.cpp`), not the
   designer name, because some weapons share a designer name (USP-S / P2000). Each also gets a `WeaponClass` for the
   Phase 5 triggerbot filter.

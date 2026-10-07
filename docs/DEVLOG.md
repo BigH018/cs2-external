@@ -493,3 +493,46 @@ warning; CPU over 6 s the same as the previous build (1.5-2.2 s each, measured s
 before, likely the driver in `Present`). **Not verified here:** the key presses themselves.
 
 **User (2026-10-07):** all good after the fix (on/off keys flip on each tap); approved for commit. Phase 7 done.
+
+## 2026-10-07: Phase 8, settings and profiles (JSON) + presets
+
+**Built**
+- Vendored **nlohmann/json v3.12.0** (approved by the user): copied from the AC project, SHA-256 of `json.hpp` checked
+  against the official release asset, `LICENSE.MIT` against the tag (`external/README.md`).
+- `settings/profile_json` (pure, the AC design): one field list per section (`visit_*` templates) drives both writing
+  and reading, with nested sections (`esp.colours`, `triggerbot.weapons`, `radar.colours`). Forgiving load: unknown
+  keys ignored, missing keys keep their defaults, wrong types / bad enums / bad colours / keys an action can't take
+  fall back to the default, numbers clamped to their `config::Range` (whole numbers rounded); every problem becomes a
+  warning like `esp.thickness: 99 adjusted to 4 (range/rounding)`. `schema_version` 1 + a migration hook. Colours
+  `#RRGGBBAA`, keys by name (`"Mouse 4"`), null = unbound.
+- `settings/profile_store` (ported from AC): `<exe folder>\profiles\<name>.json`, atomic save (`.tmp` + replace),
+  built-in read-only `default`, `.last_profile`, safe names (no paths, no device names), startup falls back to
+  `default` with a warning if the last profile is gone or broken.
+- `settings/presets` (pure): Off / Chill / Medium / Rage with the values the user picked. Features and strengths only;
+  keybinds, colours, team mode, team checks, max distances, the overlay and positions are never touched.
+- `input/actions`: a Presets category with four press actions (unbound by default).
+- `app/frame`: loads the last profile before the overlay starts (and logs each warning); the menu queues profile
+  operations and presets in `AppState::requests`, done at the start of the next frame; loading or resetting cancels a
+  capture and turns toggle keys off. `AppState::unsaved_changes()` compares the settings with the profile as saved.
+- Settings page: Profiles card (list with the loaded one marked, double-click loads; Load, Delete with confirmation,
+  Save, Reset to defaults, a name box with Save as / Rename current, the result line, the loaded profile's warnings,
+  the folder) and a Presets card; Home shows the profile and "unsaved changes".
+- Every settings struct got a defaulted `operator==`. `Color::rgba(0xRRGGBBAA)` / `to_rgba()`; the three defaults
+  with a fractional alpha (skeleton, FOV circle, radar background) are now byte-exact so they survive a save and load
+  unchanged (0.9 → 0xE6, 0.35 → 0x59, 0.72 → 0xB8: not visible).
+- `profiles/default.json` committed; a test checks it equals the code defaults (writes `default.json.expected` on a
+  mismatch).
+
+**Problems and fixes**
+- Backslashes in a Python heredoc again: `external\nlohmann` in the `.vcxproj` edit became a newline and `\t` a tab.
+  Redone with the Edit tool.
+- The default.json test couldn't write its `.expected` file until `profiles/` existed.
+
+**Verified here:** Debug and Release zero warnings; tests 216/216 in both (+25: JSON round trips, format, forgiving
+load, keybinds, schema version, default.json; store names / save / load / read-only default / rename / delete / last
+profile / startup fallback; presets). Against the running game: with no profiles the tool logs `Profile "default"
+loaded (0 warnings)`; with a hand-broken `smoke_test.json` as the last profile it logs its four warnings, clamps the
+thickness, keeps INSERT as the menu key (Mouse 1 refused) and names F8 as panic. Test files deleted afterwards.
+**Not verified here:** the Settings page on screen and any button on it (no input was sent to the game).
+
+**User (2026-10-07):** everything works; approved for commit. Phase 8 done.
