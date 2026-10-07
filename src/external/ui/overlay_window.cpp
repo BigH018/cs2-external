@@ -7,6 +7,7 @@
 
 #include "config.h"
 #include "core/log.h"
+#include "input/keys.h"
 
 namespace ui
 {
@@ -74,7 +75,45 @@ bool OverlayWindow::create(MessageHook hook)
         logger::error("DwmExtendFrameIntoClientArea failed (0x{:08X})", hresult_bits(hr));
         return false;
     }
+    raw_input_ = register_raw_input();
     return create_device();
+}
+
+bool OverlayWindow::register_raw_input() noexcept
+{
+    // Generic desktop page (0x01): mouse (0x02) and keyboard (0x06), delivered to this window in the background too.
+    const RAWINPUTDEVICE devices[] = {
+        {0x01, 0x02, RIDEV_INPUTSINK, hwnd_},
+        {0x01, 0x06, RIDEV_INPUTSINK, hwnd_},
+    };
+    if (!RegisterRawInputDevices(devices, static_cast<UINT>(std::size(devices)), sizeof(RAWINPUTDEVICE)))
+    {
+        logger::warn("Raw input couldn't be registered (error {}): keys are read once per frame instead, so very "
+                     "quick taps may be missed",
+                     GetLastError());
+        return false;
+    }
+    return true;
+}
+
+void OverlayWindow::on_raw_input(LPARAM lparam) noexcept
+{
+    RAWINPUT input{};
+    UINT size = sizeof(input);
+    if (GetRawInputData(reinterpret_cast<HRAWINPUT>(lparam), RID_INPUT, &input, &size, sizeof(RAWINPUTHEADER)) ==
+        static_cast<UINT>(-1))
+    {
+        return;
+    }
+    if (input.header.dwType == RIM_TYPEKEYBOARD)
+    {
+        const RAWKEYBOARD& keyboard = input.data.keyboard;
+        keys_.on_keyboard(keyboard.VKey, keyboard.MakeCode, keyboard.Flags);
+    }
+    else if (input.header.dwType == RIM_TYPEMOUSE)
+    {
+        keys_.on_mouse_buttons(input.data.mouse.usButtonFlags);
+    }
 }
 
 bool OverlayWindow::create_device()
@@ -152,6 +191,15 @@ void OverlayWindow::resize_buffers()
 
 void OverlayWindow::destroy() noexcept
 {
+    if (raw_input_)
+    {
+        const RAWINPUTDEVICE devices[] = {
+            {0x01, 0x02, RIDEV_REMOVE, nullptr},
+            {0x01, 0x06, RIDEV_REMOVE, nullptr},
+        };
+        RegisterRawInputDevices(devices, static_cast<UINT>(std::size(devices)), sizeof(RAWINPUTDEVICE));
+        raw_input_ = false;
+    }
     if (hotkey_registered_)
     {
         UnregisterHotKey(hwnd_, kMenuHotkeyId);
@@ -209,31 +257,36 @@ OverlayWindow::Events OverlayWindow::pump()
 
 void OverlayWindow::wait(std::uint32_t timeout_ms) const noexcept
 {
-    MsgWaitForMultipleObjects(0, nullptr, FALSE, timeout_ms, QS_ALLINPUT);
+    MsgWaitForMultipleObjects(0, nullptr, FALSE, timeout_ms, QS_ALLINPUT & ~QS_RAWINPUT);
 }
 
-void OverlayWindow::enable_menu_hotkey(bool enable) noexcept
+void OverlayWindow::enable_menu_hotkey(bool enable, std::uint32_t vk) noexcept
 {
-    if (enable == hotkey_registered_ || hwnd_ == nullptr)
+    if (hwnd_ == nullptr)
     {
         return;
     }
-    if (!enable)
+    if (hotkey_registered_ && (!enable || vk != hotkey_vk_))
     {
         UnregisterHotKey(hwnd_, kMenuHotkeyId);
         hotkey_registered_ = false;
+    }
+    if (!enable || hotkey_registered_)
+    {
         return;
     }
-    if (RegisterHotKey(hwnd_, kMenuHotkeyId, MOD_NOREPEAT, config::kMenuToggleKey))
+    if (RegisterHotKey(hwnd_, kMenuHotkeyId, MOD_NOREPEAT, vk))
     {
         hotkey_registered_ = true;
-        hotkey_failure_logged_ = false;
+        hotkey_vk_ = vk;
+        hotkey_failed_vk_ = 0;
     }
-    else if (!hotkey_failure_logged_)
+    else if (hotkey_failed_vk_ != vk)
     {
-        logger::warn("Couldn't register {} as the menu key (error {}): another program is using it as a hotkey.",
-                     config::kMenuToggleKeyName, GetLastError());
-        hotkey_failure_logged_ = true;
+        logger::warn("Couldn't register {} as the menu key (error {}): another program (or Windows) is using it as a "
+                     "hotkey. Pick another key on the Keybinds page.",
+                     input::key_name(vk), GetLastError());
+        hotkey_failed_vk_ = vk;
     }
 }
 
@@ -360,6 +413,9 @@ LRESULT OverlayWindow::handle_message(HWND hwnd, UINT message, WPARAM wparam, LP
         return 0;
     case WM_ERASEBKGND:
         return 1; // the swap chain paints everything
+    case WM_INPUT:
+        on_raw_input(lparam);
+        break; // DefWindowProc cleans the raw input up
     case WM_SYSCOMMAND:
         if ((wparam & 0xFFF0) == SC_KEYMENU)
         {

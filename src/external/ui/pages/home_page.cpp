@@ -6,6 +6,7 @@
 #include "config.h"
 #include "features/feature_summary.h"
 #include "game/weapon.h"
+#include "input/keys.h"
 #include "ui/pages/pages.h"
 #include "ui/widgets.h"
 
@@ -95,14 +96,19 @@ void draw_status(PageContext& ctx)
 void draw_how_to(PageContext& ctx)
 {
     widgets::card_begin(ctx.fonts, "Using the overlay");
+    const settings::KeybindSettings& keys = ctx.app.settings.keybinds;
     widgets::hint(std::format("{} opens and closes this menu. While it's open the game doesn't get your mouse or "
                               "keyboard, so clicks here never shoot.",
-                              config::kMenuToggleKeyName)
+                              input::key_name(keys.bind(input::ActionId::menu_toggle).key))
                       .c_str());
     widgets::hint("The overlay is a separate, click-through window on top of the game. It hides when the game loses "
                   "focus (Alt+Tab) and follows the game window when it moves or changes resolution.");
-    widgets::hint("To exit: Ctrl+C in the console window (or close it), or Alt+F4 while the menu is open. The game "
-                  "keeps running.");
+    widgets::hint(std::format("Panic ({}) turns every feature off. To exit: {}, Ctrl+C in the console window (or close "
+                              "it), or Alt+F4 while the menu is open. The game keeps running. Every key can be changed "
+                              "on the Keybinds page.",
+                              input::key_name(keys.bind(input::ActionId::panic).key),
+                              input::key_name(keys.bind(input::ActionId::exit).key))
+                      .c_str());
     widgets::card_end();
 }
 } // namespace

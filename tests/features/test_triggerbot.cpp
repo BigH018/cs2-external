@@ -4,7 +4,6 @@
 #include <doctest.h>
 
 #include "config.h"
-#include "features/activation.h"
 #include "features/triggerbot.h"
 #include "helpers/fake_game.h"
 #include "maths/skeleton.h"
@@ -251,19 +250,4 @@ TEST_CASE("Triggerbot: inactive never fires; a tap in progress finishes; reset l
         bot.reset();
         CHECK_FALSE(bot.attack_down());
     }
-}
-
-TEST_CASE("KeyActivation: hold follows the key, toggle flips on each press")
-{
-    features::KeyActivation key;
-    CHECK_FALSE(key.update(false, settings::BindMode::hold));
-    CHECK(key.update(true, settings::BindMode::hold));
-    CHECK_FALSE(key.update(false, settings::BindMode::hold));
-
-    CHECK(key.update(true, settings::BindMode::toggle));  // press: on
-    CHECK(key.update(true, settings::BindMode::toggle));  // still held: stays on
-    CHECK(key.update(false, settings::BindMode::toggle)); // released: stays on
-    CHECK_FALSE(key.update(true, settings::BindMode::toggle)); // second press: off
-    key.reset();
-    CHECK_FALSE(key.update(false, settings::BindMode::toggle));
 }

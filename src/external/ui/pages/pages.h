@@ -24,5 +24,6 @@ void draw_aimbot(PageContext& ctx);
 void draw_triggerbot(PageContext& ctx);
 void draw_esp(PageContext& ctx);
 void draw_misc(PageContext& ctx);
+void draw_keybinds(PageContext& ctx);
 void draw_settings(PageContext& ctx);
 } // namespace ui::pages

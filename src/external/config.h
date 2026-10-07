@@ -57,9 +57,8 @@ inline constexpr float kMinHeadHeight = 30.0f;            // --diag: the head bo
 inline constexpr float kMaxHeadHeight = 80.0f;            //   crouching (~45) to standing (~60), with margin
 
 // --- Keys ----------------------------------------------------------------------------------------------------------
-// Temporary hard-coded menu key until the Phase 7 keybind engine. Virtual-key code VK_INSERT (no <Windows.h> here).
-inline constexpr std::uint32_t kMenuToggleKey = 0x2D;
-inline constexpr char kMenuToggleKeyName[] = "INSERT";
+// Every key is a keybind (input/actions, default binds there). A capture gives up after this long without a key.
+inline constexpr std::uint64_t kBindCaptureTimeoutMs = 6000;
 
 // --- Menu (ImGui) --------------------------------------------------------------------------------------------------
 inline constexpr float kMenuWidth = 920.0f;  // initial size in pixels (shrunk to fit small game windows)

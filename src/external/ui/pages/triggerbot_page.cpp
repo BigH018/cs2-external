@@ -3,6 +3,7 @@
 #include "config.h"
 #include "features/triggerbot.h"
 #include "settings/settings.h"
+#include "ui/keybind_widgets.h"
 #include "ui/pages/controls.h"
 #include "ui/pages/pages.h"
 #include "ui/widgets.h"
@@ -31,18 +32,17 @@ void draw_general(PageContext& ctx, settings::TriggerbotSettings& trigger)
     widgets::card_begin(ctx.fonts, "Triggerbot");
     check("Enabled", &trigger.enabled,
           "Fires for you while an enemy is under your crosshair (the game's own \"what am I aiming at\" value).");
-    static constexpr const char* kActivations[] = {"Always on", "Hold key", "Toggle key"};
+    static constexpr const char* kActivations[] = {"Always on", "Trigger key"};
     ImGui::SetNextItemWidth(scaled(160.0f));
-    combo("Activation", trigger.activation, kActivations, 3);
-    if (trigger.activation != settings::TriggerActivation::always)
-    {
-        ImGui::SameLine(0.0f, scaled(24.0f));
-        ImGui::SetNextItemWidth(scaled(140.0f));
-        key_combo("Key", trigger.key);
-    }
+    combo("Activation", trigger.activation, kActivations, 2);
     ImGui::SameLine();
-    widgets::help_marker("Always on: whenever it's enabled. Hold key: while the key is down. Toggle key: each press "
-                         "switches it on or off. Every key arrives with the keybind engine (Phase 7).");
+    widgets::help_marker("Always on: whenever it's enabled. Trigger key: while the key below is held, or toggled on "
+                         "(its mode).");
+    if (trigger.activation == settings::TriggerActivation::key)
+    {
+        keybind::bind_row(ctx.app, input::ActionId::triggerbot_activate, "Trigger key");
+    }
+    keybind::bind_row(ctx.app, input::ActionId::triggerbot_enable, "On / off key");
     if (trigger.enabled)
     {
         widgets::info_row("Status", !ctx.app.trigger_status.active ? "waiting for the key"

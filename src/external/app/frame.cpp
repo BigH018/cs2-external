@@ -11,7 +11,6 @@
 #include "config.h"
 #include "core/log.h"
 #include "core/runtime.h"
-#include "features/activation.h"
 #include "features/aimbot.h"
 #include "features/bomb_timer.h"
 #include "features/esp.h"
@@ -23,6 +22,10 @@
 #include "game/offsets.h"
 #include "game/player.h"
 #include "game/writes.h"
+#include "input/actions.h"
+#include "input/key_poll.h"
+#include "input/keybinds.h"
+#include "input/keys.h"
 #include "maths/vec.h"
 #include "render/painter.h"
 #include "render/primitives.h"
@@ -48,12 +51,6 @@ bool client_area(HWND window, RECT& area) noexcept
     return client.right > 0 && client.bottom > 0;
 }
 
-// Phase 5 polls the few keys it needs; Phase 7's keybind engine (input/key_poll) replaces this.
-bool key_down(std::uint32_t vk) noexcept
-{
-    return (GetAsyncKeyState(static_cast<int>(vk)) & 0x8000) != 0;
-}
-
 class Runner
 {
 public:
@@ -70,9 +67,11 @@ public:
         {
             return 1;
         }
-        logger::info("Overlay running. {} opens the menu. Exit: Ctrl+C here (or close this window), or Alt+F4 while "
-                     "the menu is open.",
-                     config::kMenuToggleKeyName);
+        const settings::KeybindSettings& keys = state_.settings.keybinds;
+        logger::info("Overlay running. {} opens the menu, {} is panic. Exit: {}, Ctrl+C here (or close this window), "
+                     "or Alt+F4 while the menu is open.",
+                     input::key_name(menu_key()), input::key_name(keys.bind(input::ActionId::panic).key),
+                     input::key_name(keys.bind(input::ActionId::exit).key));
 
         int exit_code = 0;
         while (!core::shutdown_requested.load())
@@ -93,6 +92,11 @@ public:
                 exit_code = 1;
                 break;
             }
+            if (exit_requested_)
+            {
+                logger::info("Exit key: exiting");
+                break;
+            }
         }
 
         stop_features(); // let go of attack if the triggerbot holds it
@@ -110,6 +114,9 @@ private:
     // One frame. false = the overlay can't go on (device lost).
     bool frame(const ui::OverlayWindow::Events& events)
     {
+        state_.now_ms = GetTickCount64();
+        // Taken every frame, also while hidden: presses made while we aren't listening are dropped, not saved up.
+        const input::PressCounts presses = overlay_.take_presses();
         if (!find_game_window())
         {
             hide();
@@ -119,13 +126,17 @@ private:
         const HWND foreground = GetForegroundWindow();
         const bool game_focused = foreground == game_window_;
         const bool overlay_focused = foreground == overlay_.hwnd();
-        overlay_.enable_menu_hotkey(game_focused || overlay_focused);
+        // While a bind is being captured the menu key is just a key (it may be the one being bound).
+        const bool capturing = state_.capture.active();
+        overlay_.enable_menu_hotkey((game_focused || overlay_focused) && !capturing, menu_key());
+        state_.menu_key_failed = overlay_.menu_hotkey_failed();
 
-        if (events.menu_key && state_.menu_open)
+        const bool menu_key_pressed = events.menu_key && !capturing;
+        if (menu_key_pressed && state_.menu_open)
         {
             close_menu(true);
         }
-        else if (events.menu_key)
+        else if (menu_key_pressed)
         {
             open_menu();
         }
@@ -143,6 +154,11 @@ private:
             return true;
         }
         follow(area);
+        run_keybinds(read_keys(game_focused || overlay_focused, presses)); // may turn features off or ask to exit
+        if (exit_requested_)
+        {
+            return true;
+        }
         const settings::Settings& settings = state_.settings;
         state_.active.esp = settings.esp.enabled;
         state_.active.aimbot = settings.aimbot.enabled;
@@ -209,7 +225,7 @@ private:
             close_menu(false);
         }
         overlay_.set_visible(false);
-        overlay_.enable_menu_hotkey(false);
+        overlay_.enable_menu_hotkey(false, menu_key());
         overlay_.wait(config::kHiddenPollIntervalMs);
     }
 
@@ -263,6 +279,106 @@ private:
         }
     }
 
+    [[nodiscard]] std::uint32_t menu_key() const noexcept
+    {
+        return state_.settings.keybinds.bind(input::ActionId::menu_toggle).key;
+    }
+
+    // This frame's keys, only while the game or the overlay is in front (GetAsyncKeyState and raw input see every
+    // program): held keys from polling, presses from raw input (every tap, however short the frame), or from comparing
+    // two polls if raw input isn't available.
+    input::KeyFrame read_keys(bool focused, const input::PressCounts& raw_presses)
+    {
+        input::KeyFrame keys;
+        if (!focused)
+        {
+            return keys;
+        }
+        keys.down = input::poll_keys();
+        keys.presses = overlay_.raw_input() ? raw_presses : input::presses_from_edges(previous_down_, keys.down);
+        previous_down_ = keys.down;
+        return keys;
+    }
+
+    // Feed a running bind capture, then the keybind engine, then act on what fired. While a capture runs nothing
+    // fires; while the menu is open only panic and exit do. The menu key itself is the overlay's hotkey (frame()), not
+    // an engine action.
+    void run_keybinds(const input::KeyFrame& keys)
+    {
+        const bool was_capturing = state_.capture.active();
+        if (was_capturing)
+        {
+            input::KeySet down = keys.down_or_pressed();
+            if (ImGui::GetIO().WantCaptureMouse)
+            {
+                down.reset(input::kVkMouse1); // a click in the menu is a click: Mouse 1 is bound outside the menu
+            }
+            if (const auto result = state_.capture.update(down, state_.now_ms))
+            {
+                state_.settings.keybinds.bind(result->action).key = result->key;
+                logger::info("{}: {}", input::action(result->action).label, input::key_name(result->key));
+            }
+        }
+        // The frame a capture ends still counts as capturing, so the new key doesn't fire its action straight away.
+        const input::Suspension suspension = was_capturing      ? input::Suspension::capture
+                                             : state_.menu_open ? input::Suspension::menu_open
+                                                                : input::Suspension::none;
+        actions_ = keybinds_.update(keys, state_.settings.keybinds.binds, suspension);
+        handle_actions();
+    }
+
+    void handle_actions()
+    {
+        if (actions_.did_fire(input::ActionId::exit))
+        {
+            exit_requested_ = true;
+            return;
+        }
+        if (actions_.did_fire(input::ActionId::panic))
+        {
+            panic();
+            return;
+        }
+        settings::Settings& settings = state_.settings;
+        flip(input::ActionId::aimbot_enable, settings.aimbot.enabled, "Aimbot");
+        flip(input::ActionId::triggerbot_enable, settings.triggerbot.enabled, "Triggerbot");
+        flip(input::ActionId::esp_enable, settings.esp.enabled, "ESP");
+        flip(input::ActionId::radar_enable, settings.radar.enabled, "Radar");
+        flip(input::ActionId::bomb_timer_enable, settings.bomb_timer.enabled, "Bomb timer");
+        flip(input::ActionId::spectators_enable, settings.spectators.enabled, "Spectator list");
+    }
+
+    // An "on / off" action: each press flips the feature's Enabled switch (two quick presses in one frame: back
+    // where it was).
+    void flip(input::ActionId id, bool& enabled, const char* name)
+    {
+        if (actions_.press_count(id) % 2 == 1)
+        {
+            enabled = !enabled;
+            logger::info("{} {}", name, enabled ? "on" : "off");
+        }
+    }
+
+    // Every feature off, every toggle key off, nothing pressed, the menu closed.
+    void panic()
+    {
+        settings::Settings& settings = state_.settings;
+        settings.esp.enabled = false;
+        settings.aimbot.enabled = false;
+        settings.triggerbot.enabled = false;
+        settings.radar.enabled = false;
+        settings.bomb_timer.enabled = false;
+        settings.spectators.enabled = false;
+        keybinds_.reset_toggles();
+        actions_ = {};
+        stop_features();
+        if (state_.menu_open)
+        {
+            close_menu(true);
+        }
+        logger::info("Panic: every feature off");
+    }
+
     // Seconds since the previous frame (0 on the first), for the aimbot's frame-rate-independent smoothing.
     float frame_time()
     {
@@ -278,11 +394,10 @@ private:
         const settings::AimbotSettings& aim = state_.settings.aimbot;
         if (!aim.enabled)
         {
-            aim_key_.reset();
             state_.aim_status = {};
             return;
         }
-        const bool active = aim_key_.update(playing && key_down(aim.key), aim.mode) && playing;
+        const bool active = playing && actions_.is_active(input::ActionId::aimbot_activate);
         state_.aim_status = {active, false};
         if (!active)
         {
@@ -302,20 +417,13 @@ private:
         const settings::TriggerbotSettings& trigger = state_.settings.triggerbot;
         if (!trigger.enabled)
         {
-            trigger_key_.reset();
             triggerbot_.reset();
             state_.trigger_status = {};
             set_attack(false);
             return;
         }
-        bool allowed = true;
-        if (trigger.activation != settings::TriggerActivation::always)
-        {
-            const settings::BindMode mode = trigger.activation == settings::TriggerActivation::hold
-                                                ? settings::BindMode::hold
-                                                : settings::BindMode::toggle;
-            allowed = trigger_key_.update(playing && key_down(trigger.key), mode);
-        }
+        const bool allowed = trigger.activation == settings::TriggerActivation::always ||
+                             actions_.is_active(input::ActionId::triggerbot_activate);
         const bool active = allowed && playing;
         const features::TriggerBlock block =
             features::trigger_block(state_.snapshot, trigger, state_.settings.general.team_mode);
@@ -332,7 +440,7 @@ private:
             return;
         }
         attack_down_ = down;
-        if (!down && key_down(VK_LBUTTON))
+        if (!down && input::is_key_down(input::kVkMouse1))
         {
             return;
         }
@@ -342,13 +450,12 @@ private:
         }
     }
 
-    // The game lost focus, the overlay hides or the tool exits: nothing may stay pressed.
+    // The game lost focus, the overlay hides or the tool exits: nothing may stay pressed. Toggle keys keep their state
+    // (a toggled-on aim key is still on after Alt+Tab); hold keys read released because nothing is polled.
     void stop_features()
     {
         triggerbot_.reset();
         set_attack(false);
-        aim_key_.reset();
-        trigger_key_.reset();
         last_frame_.reset();
     }
 
@@ -406,6 +513,7 @@ private:
 
     void close_menu(bool give_focus_back)
     {
+        state_.capture.cancel();
         state_.menu_open = false;
         state_.focus_warning = false;
         imgui_.set_menu_open(false);
@@ -426,8 +534,10 @@ private:
     bool overlay_had_focus_ = false;
     RECT last_area_{};
     std::uint64_t next_status_ms_ = 0;
-    features::KeyActivation aim_key_;
-    features::KeyActivation trigger_key_;
+    input::KeybindEngine keybinds_;
+    input::KeySet previous_down_; // last frame's held keys (presses without raw input)
+    input::ActionStates actions_; // this frame's keybind states
+    bool exit_requested_ = false; // the exit key fired
     features::Triggerbot triggerbot_;
     bool attack_down_ = false; // what we last wrote to the attack button
     bool write_warned_ = false;

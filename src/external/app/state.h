@@ -9,6 +9,7 @@
 #include "features/feature_summary.h"
 #include "features/triggerbot.h"
 #include "game/snapshot.h"
+#include "input/bind_capture.h"
 #include "settings/settings.h"
 
 namespace app
@@ -44,7 +45,7 @@ struct AppState
     // What the aimbot and triggerbot are doing this frame, for their pages.
     struct AimStatus
     {
-        bool active = false;     // enabled, key held / toggled on, menu closed, game focused
+        bool active = false;     // enabled, aim key held / toggled on, menu closed, game focused
         bool has_target = false; // a target inside the FOV this frame
     } aim_status;
     struct TriggerStatus
@@ -55,6 +56,11 @@ struct AppState
 
     bool menu_open = false;
     bool focus_warning = false; // the menu opened but couldn't take focus from the game
+
+    // Keybinds: the menu starts a capture (Keybinds page, bind buttons); app/frame feeds it keys and stores the result.
+    input::BindCapture capture;
+    std::uint64_t now_ms = 0;     // GetTickCount64 at the start of this frame (for the capture's timeout)
+    bool menu_key_failed = false; // the menu key couldn't be registered as a hotkey (another program holds it)
 
     // Match status, refreshed every config::kStatusIntervalMs while the overlay is visible.
     bool pawn_read_ok = false;

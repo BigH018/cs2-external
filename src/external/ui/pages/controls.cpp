@@ -1,9 +1,6 @@
 #include "ui/pages/controls.h"
 
-#include <string>
-
 #include "config.h"
-#include "input/keys.h"
 #include "ui/theme.h"
 #include "ui/widgets.h"
 
@@ -22,31 +19,6 @@ bool check(const char* label, bool* value, const char* help)
 bool colour(const char* label, Color& value)
 {
     return ImGui::ColorEdit4(label, &value.r, ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_NoInputs);
-}
-
-bool key_combo(const char* label, std::uint32_t& vk)
-{
-    const std::string current(input::key_name(vk));
-    bool changed = false;
-    if (ImGui::BeginCombo(label, current.c_str()))
-    {
-        for (const input::KeyInfo& key : input::kBindableKeys)
-        {
-            const std::string name(key.name);
-            const bool selected = key.vk == vk;
-            if (ImGui::Selectable(name.c_str(), selected))
-            {
-                vk = key.vk;
-                changed = true;
-            }
-            if (selected)
-            {
-                ImGui::SetItemDefaultFocus();
-            }
-        }
-        ImGui::EndCombo();
-    }
-    return changed;
 }
 
 bool team_mode_combo(settings::TeamMode& mode)

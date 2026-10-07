@@ -3,6 +3,7 @@
 #include "color.h"
 #include "config.h"
 #include "settings/settings.h"
+#include "ui/keybind_widgets.h"
 #include "ui/pages/controls.h"
 #include "ui/pages/pages.h"
 #include "ui/widgets.h"
@@ -16,6 +17,7 @@ void draw_general(PageContext& ctx, settings::EspSettings& esp)
     widgets::card_begin(ctx.fonts, "ESP");
     check("Enabled", &esp.enabled,
           "Draws boxes and labels over the bots, through walls. Everything below applies live.");
+    keybind::bind_row(ctx.app, input::ActionId::esp_enable, "On / off key");
     settings::TeamMode& team_mode = ctx.app.settings.general.team_mode;
     team_mode_combo(team_mode);
     if (team_mode == settings::TeamMode::teams)

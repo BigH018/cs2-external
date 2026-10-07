@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "settings/settings.h"
+#include "ui/keybind_widgets.h"
 #include "ui/pages/controls.h"
 #include "ui/pages/pages.h"
 #include "ui/widgets.h"
@@ -16,15 +17,8 @@ void draw_general(PageContext& ctx, settings::AimbotSettings& aim)
     check("Enabled", &aim.enabled,
           "Turns your view towards a bot while the aim key is held (or toggled on). It writes the game's view "
           "angles from outside, so the camera visibly moves: there is no silent aim externally.");
-    ImGui::SetNextItemWidth(scaled(140.0f));
-    key_combo("Aim key", aim.key);
-    ImGui::SameLine(0.0f, scaled(24.0f));
-    static constexpr const char* kModes[] = {"Hold", "Toggle"};
-    ImGui::SetNextItemWidth(scaled(120.0f));
-    combo("Mode", aim.mode, kModes, 2);
-    ImGui::SameLine();
-    widgets::help_marker("Hold: aims while the key is down. Toggle: each press switches aiming on or off. Mouse 1 "
-                         "(the default) aims while you shoot. Every key arrives with the keybind engine (Phase 7).");
+    keybind::bind_row(ctx.app, input::ActionId::aimbot_activate, "Aim key");
+    keybind::bind_row(ctx.app, input::ActionId::aimbot_enable, "On / off key");
     const auto& status = ctx.app.aim_status;
     if (aim.enabled)
     {

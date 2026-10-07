@@ -3,9 +3,10 @@
 // The orchestrator (same role as in the AC project): the only place that wires the overlay window, ImGui, game reads
 // and the menu together, one frame at a time. Main thread only.
 //
-// One frame: pump messages -> follow the game window and focus -> menu key -> game snapshot (every frame while the
-// ESP, aimbot or triggerbot is on, ~4 Hz otherwise) -> aimbot (view angle write) -> triggerbot (attack button write)
-// -> ESP + FOV circle -> HUD + menu -> present. Phase 7 replaces the key polling with the keybind engine.
+// One frame: pump messages (raw input counts key presses) -> follow the game window and focus -> menu key (the
+// overlay's hotkey) -> keybinds (poll, bind capture, engine, actions: panic, exit, on / off keys) -> game snapshot
+// (every frame while a feature is on, ~4 Hz otherwise) -> aimbot (view angle write) -> triggerbot (attack button
+// write) -> ESP, radar, panels -> HUD + menu -> present.
 
 #include <Windows.h>
 
@@ -26,7 +27,7 @@ struct Context
     OffsetReport offsets; // the startup diagnostic's result, for the Home page
 };
 
-// Runs the overlay until the user exits (core::shutdown_requested or Alt+F4 on the menu), the game closes, or the
-// overlay fails. Tears the overlay down before returning. Returns the process exit code.
+// Runs the overlay until the user exits (the exit key, core::shutdown_requested or Alt+F4 on the menu), the game
+// closes, or the overlay fails. Tears the overlay down before returning. Returns the process exit code.
 int run(const Context& ctx);
 } // namespace app

@@ -8,6 +8,7 @@
 #include <cstdint>
 
 #include "color.h"
+#include "input/actions.h"
 
 namespace settings
 {
@@ -31,12 +32,13 @@ struct GeneralSettings
     TeamMode team_mode = TeamMode::teams;
 };
 
-// How a key switches a feature on. Phase 7's keybind engine adds PRESS and key capture; until then a key is chosen
-// from input::kBindableKeys.
-enum class BindMode : std::uint8_t
+// Every action's key and mode (input/actions). The aim key, the trigger key and the menu key live here too.
+struct KeybindSettings
 {
-    hold,   // on while the key is held
-    toggle, // each press switches it on or off
+    input::Binds binds = input::default_binds();
+
+    [[nodiscard]] input::Bind& bind(input::ActionId id) noexcept { return binds[input::index_of(id)]; }
+    [[nodiscard]] const input::Bind& bind(input::ActionId id) const noexcept { return binds[input::index_of(id)]; }
 };
 
 enum class BoxStyle : std::uint8_t
@@ -109,9 +111,7 @@ enum class AimPriority : std::uint8_t
 
 struct AimbotSettings
 {
-    bool enabled = false;
-    std::uint32_t key = 0x01; // virtual-key code (input::kBindableKeys): Mouse 1, so it aims while you shoot
-    BindMode mode = BindMode::hold;
+    bool enabled = false; // aims while the aim key (KeybindSettings, ActionId::aimbot_activate) is held / toggled on
     AimTarget target = AimTarget::head;
     AimPriority priority = AimPriority::crosshair;
     float fov = 5.0f;          // degrees from the crosshair (config::kAimFov)
@@ -127,8 +127,7 @@ struct AimbotSettings
 enum class TriggerActivation : std::uint8_t
 {
     always,
-    hold,   // while the key is held
-    toggle, // each press switches it on or off
+    key, // while the trigger key (KeybindSettings, ActionId::triggerbot_activate) is held / toggled on
 };
 
 enum class FireMode : std::uint8_t
@@ -152,8 +151,7 @@ struct WeaponFilter
 struct TriggerbotSettings
 {
     bool enabled = false;
-    TriggerActivation activation = TriggerActivation::hold;
-    std::uint32_t key = 0x05;  // virtual-key code (input::kBindableKeys): Mouse 4
+    TriggerActivation activation = TriggerActivation::key;
     int reaction_ms = 40;      // from the target appearing to the first shot (config::kTriggerReaction)
     FireMode fire_mode = FireMode::single;
     int burst_shots = 3;       // burst mode (config::kTriggerBurst)
@@ -239,5 +237,6 @@ struct Settings
     RadarSettings radar;
     BombTimerSettings bomb_timer;
     SpectatorSettings spectators;
+    KeybindSettings keybinds;
 };
 } // namespace settings

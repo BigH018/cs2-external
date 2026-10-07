@@ -85,12 +85,19 @@
     <ClCompile Include="game\visibility.cpp" />
     <ClCompile Include="game\weapon.cpp" />
     <ClCompile Include="game\writes.cpp" />
+    <ClCompile Include="input\actions.cpp" />
+    <ClCompile Include="input\bind_capture.cpp" />
+    <ClCompile Include="input\keybinds.cpp" />
+    <ClCompile Include="input\key_poll.cpp" />
+    <ClCompile Include="input\key_tracker.cpp" />
+    <ClCompile Include="input\keys.cpp" />
     <ClCompile Include="maths\angles.cpp" />
     <ClCompile Include="maths\projection.cpp" />
     <ClCompile Include="maths\skeleton.cpp" />
     <ClCompile Include="render\painter.cpp" />
     <ClCompile Include="ui\hud.cpp" />
     <ClCompile Include="ui\imgui_layer.cpp" />
+    <ClCompile Include="ui\keybind_widgets.cpp" />
     <ClCompile Include="ui\menu.cpp" />
     <ClCompile Include="ui\overlay_window.cpp" />
     <ClCompile Include="ui\theme.cpp" />
@@ -99,6 +106,7 @@
     <ClCompile Include="ui\pages\controls.cpp" />
     <ClCompile Include="ui\pages\esp_page.cpp" />
     <ClCompile Include="ui\pages\home_page.cpp" />
+    <ClCompile Include="ui\pages\keybinds_page.cpp" />
     <ClCompile Include="ui\pages\misc_page.cpp" />
     <ClCompile Include="ui\pages\settings_page.cpp" />
     <ClCompile Include="ui\pages\triggerbot_page.cpp" />
@@ -117,7 +125,6 @@
     <ClInclude Include="core\process.h" />
     <ClInclude Include="core\process_memory.h" />
     <ClInclude Include="core\runtime.h" />
-    <ClInclude Include="features\activation.h" />
     <ClInclude Include="features\aimbot.h" />
     <ClInclude Include="features\esp.h" />
     <ClInclude Include="features\feature_summary.h" />
@@ -144,6 +151,11 @@
     <ClInclude Include="game\visibility.h" />
     <ClInclude Include="game\weapon.h" />
     <ClInclude Include="game\writes.h" />
+    <ClInclude Include="input\actions.h" />
+    <ClInclude Include="input\bind_capture.h" />
+    <ClInclude Include="input\keybinds.h" />
+    <ClInclude Include="input\key_poll.h" />
+    <ClInclude Include="input\key_tracker.h" />
     <ClInclude Include="input\keys.h" />
     <ClInclude Include="maths\angles.h" />
     <ClInclude Include="maths\projection.h" />
@@ -154,6 +166,7 @@
     <ClInclude Include="settings\settings.h" />
     <ClInclude Include="ui\hud.h" />
     <ClInclude Include="ui\imgui_layer.h" />
+    <ClInclude Include="ui\keybind_widgets.h" />
     <ClInclude Include="ui\logo_pixels.h" />
     <ClInclude Include="ui\menu.h" />
     <ClInclude Include="ui\overlay_window.h" />

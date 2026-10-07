@@ -27,7 +27,8 @@ constexpr std::array kPages = {
     PageEntry{Page::Triggerbot, "Triggerbot", nullptr, &pages::draw_triggerbot},
     PageEntry{Page::Esp, "ESP", "VISUALS", &pages::draw_esp},
     PageEntry{Page::Misc, "Misc", nullptr, &pages::draw_misc},
-    PageEntry{Page::Settings, "Settings", "SETUP", &pages::draw_settings},
+    PageEntry{Page::Keybinds, "Keybinds", "SETUP", &pages::draw_keybinds},
+    PageEntry{Page::Settings, "Settings", nullptr, &pages::draw_settings},
 };
 
 // Sizes at UI scale 1.0.

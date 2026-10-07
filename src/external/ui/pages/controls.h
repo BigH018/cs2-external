@@ -1,9 +1,7 @@
 #pragma once
 
-// Controls the feature pages share: a checkbox with a (?), colour pickers, enum combos, the key picker and the
-// shared team mode. Each returns true when the user changed the value.
-
-#include <cstdint>
+// Controls the feature pages share: a checkbox with a (?), colour pickers, enum combos and the shared team mode
+// (keys: ui/keybind_widgets). Each returns true when the user changed the value.
 
 #include <imgui.h>
 
@@ -30,9 +28,6 @@ bool combo(const char* label, Enum& value, const char* const* names, int count)
     }
     return false;
 }
-
-// A virtual-key code picked from input::kBindableKeys.
-bool key_combo(const char* label, std::uint32_t& vk);
 
 // The team mode every feature shares (settings::GeneralSettings), with its (?) explaining it.
 bool team_mode_combo(settings::TeamMode& mode);

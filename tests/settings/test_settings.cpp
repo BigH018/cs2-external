@@ -1,9 +1,8 @@
-#include <cstddef>
-
 #include <doctest.h>
 
 #include "config.h"
-#include "input/keys.h"
+#include "input/actions.h"
+#include "input/keybinds.h"
 #include "settings/settings.h"
 
 TEST_CASE("Settings defaults: ESP off, sensible options, every number inside its range")
@@ -25,26 +24,24 @@ TEST_CASE("Settings defaults: ESP off, sensible options, every number inside its
     CHECK(esp.colours.enemy_visible.a == doctest::Approx(1.0f));
 }
 
-TEST_CASE("Settings defaults: aimbot and triggerbot off, every number inside its range, keys bindable")
+TEST_CASE("Settings defaults: aimbot and triggerbot off, every number inside its range")
 {
     const settings::Settings defaults;
     const settings::AimbotSettings& aim = defaults.aimbot;
     CHECK_FALSE(aim.enabled); // nothing writes to the game until the user turns it on
-    CHECK(aim.mode == settings::BindMode::hold);
     CHECK(aim.team_check);
     CHECK(config::kAimFov.contains(aim.fov));
     CHECK(config::kAimSmoothing.contains(aim.smoothing));
     CHECK(config::kMaxDistance.contains(aim.max_distance));
-    CHECK(input::key_index(aim.key) >= 0);
 
     const settings::TriggerbotSettings& trigger = defaults.triggerbot;
     CHECK_FALSE(trigger.enabled);
+    CHECK(trigger.activation == settings::TriggerActivation::key);
     CHECK(trigger.team_check);
     CHECK(config::kTriggerReaction.contains(trigger.reaction_ms));
     CHECK(config::kTriggerShotDelay.contains(trigger.shot_delay_ms));
     CHECK(config::kTriggerBurst.contains(trigger.burst_shots));
     CHECK(config::kMaxDistance.contains(trigger.max_distance));
-    CHECK(input::key_index(trigger.key) >= 0);
 }
 
 TEST_CASE("Settings defaults: radar off, every number inside its range")
@@ -79,17 +76,16 @@ TEST_CASE("Settings defaults: spectator list off, on the right under the radar, 
     CHECK_FALSE(list.hide_when_empty);
 }
 
-TEST_CASE("input::kBindableKeys: names and indices")
+TEST_CASE("Settings defaults: keybinds are the registry's defaults, with no conflicts")
 {
-    CHECK(input::key_name(0x01) == "Mouse 1");
-    CHECK(input::key_name(0x05) == "Mouse 4");
-    CHECK(input::key_name(0xFF) == "?");
-    CHECK(input::key_index(0x01) == 0);
-    CHECK(input::key_index(0xFF) == -1);
-    for (std::size_t i = 0; i < input::kBindableKeys.size(); ++i)
-    {
-        CHECK(input::key_index(input::kBindableKeys[i].vk) == static_cast<int>(i)); // no duplicates
-    }
+    const settings::KeybindSettings keybinds = settings::Settings{}.keybinds;
+    CHECK(keybinds.binds == input::default_binds());
+    CHECK(keybinds.bind(input::ActionId::menu_toggle).key == input::kVkInsert);
+    CHECK(keybinds.bind(input::ActionId::panic).key == input::kVkEnd);
+    CHECK(keybinds.bind(input::ActionId::exit).key == input::kVkDelete);
+    CHECK(keybinds.bind(input::ActionId::aimbot_activate) == input::Bind{input::kVkMouse1, input::BindMode::hold});
+    CHECK(keybinds.bind(input::ActionId::triggerbot_activate) == input::Bind{input::kVkMouse4, input::BindMode::hold});
+    CHECK(input::find_conflicts(keybinds.binds).empty());
 }
 
 TEST_CASE("config::Range")

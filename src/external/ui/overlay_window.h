@@ -8,8 +8,11 @@
 // - Click-through: WS_EX_TRANSPARENT (+ WS_EX_NOACTIVATE) while the menu is closed, so mouse input and focus go to the
 //   game underneath. set_interactive(true) drops both while the menu is open: the overlay then takes every click over
 //   the game's client area, so a click on (or next to) the menu never reaches the game.
-// - The menu hotkey (temporary until Phase 7) is a RegisterHotKey on this window. Receiving it counts as user input
-//   to our process, which is what lets SetForegroundWindow take focus from the game when the menu opens.
+// - Raw input: the window registers for keyboard and mouse raw input in the background (RIDEV_INPUTSINK) and counts
+//   every key press (input::KeyTracker), so app/frame sees taps shorter than a frame. Not a hook: Windows only tells
+//   us about input it delivers to the game anyway.
+// - The menu key (a keybind, input::ActionId::menu_toggle) is a RegisterHotKey on this window. Receiving it counts as
+//   user input to our process, which is what lets SetForegroundWindow take focus from the game when the menu opens.
 //
 // Main thread only (the window's messages are pumped on the thread that created it).
 
@@ -18,6 +21,8 @@
 #include <Windows.h>
 #include <d3d11.h>
 #include <wrl/client.h>
+
+#include "input/key_tracker.h"
 
 namespace ui
 {
@@ -52,12 +57,21 @@ public:
 
     // Dispatch every pending window message of this thread.
     Events pump();
-    // Sleep until a message arrives or `timeout_ms` passes (used while the overlay is hidden).
+    // Sleep until a message arrives or `timeout_ms` passes (used while the overlay is hidden). Raw input (every mouse
+    // move) doesn't wake it; those messages wait for the next pump.
     void wait(std::uint32_t timeout_ms) const noexcept;
 
-    // Register the menu hotkey while the game (or we) have focus, unregister otherwise, so the key still works normally
-    // in every other program.
-    void enable_menu_hotkey(bool enable) noexcept;
+    // Key presses since the last call (from raw input, pumped by pump()). Call every frame, so presses made while the
+    // tool isn't listening are dropped.
+    [[nodiscard]] input::PressCounts take_presses() noexcept { return keys_.take_presses(); }
+    // Whether raw input is registered; if not, app/frame falls back to presses from polling.
+    [[nodiscard]] bool raw_input() const noexcept { return raw_input_; }
+
+    // Register the menu hotkey (`vk`) while the game (or we) have focus, unregister otherwise, so the key still works
+    // normally in every other program. A new `vk` re-registers it.
+    void enable_menu_hotkey(bool enable, std::uint32_t vk) noexcept;
+    // The last registration of the current key failed (another program holds it as a hotkey).
+    [[nodiscard]] bool menu_hotkey_failed() const noexcept { return hotkey_failed_vk_ != 0; }
 
     // Move and size the overlay to `area` (screen coordinates of the game's client area).
     void cover(const RECT& area) noexcept;
@@ -76,6 +90,8 @@ private:
     // `hwnd` is passed in: hwnd_ is still null for the messages sent during CreateWindowExW.
     LRESULT handle_message(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam);
 
+    bool register_raw_input() noexcept;
+    void on_raw_input(LPARAM lparam) noexcept;
     bool create_device();
     bool create_render_target();
     void resize_buffers();
@@ -86,11 +102,14 @@ private:
     bool visible_ = false;
     bool interactive_ = false;
     bool hotkey_registered_ = false;
-    bool hotkey_failure_logged_ = false;
+    std::uint32_t hotkey_vk_ = 0;        // the key registered now
+    std::uint32_t hotkey_failed_vk_ = 0; // the key whose registration failed (logged once), 0 = none
     RECT area_{};
     bool resize_pending_ = false;
     bool close_requested_ = false;
     bool device_lost_logged_ = false;
+    bool raw_input_ = false;
+    input::KeyTracker keys_;
 
     Microsoft::WRL::ComPtr<ID3D11Device> device_;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> context_;

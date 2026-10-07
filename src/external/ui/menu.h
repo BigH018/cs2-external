@@ -17,6 +17,7 @@ enum class Page
     Triggerbot,
     Esp,
     Misc,
+    Keybinds,
     Settings,
 };
 

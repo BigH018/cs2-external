@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "settings/settings.h"
+#include "ui/keybind_widgets.h"
 #include "ui/pages/controls.h"
 #include "ui/pages/pages.h"
 #include "ui/widgets.h"
@@ -16,6 +17,7 @@ void draw_radar(PageContext& ctx, settings::RadarSettings& radar)
     check("Enabled", &radar.enabled,
           "Our own radar, drawn by the overlay: you in the middle, every player as a dot, through walls. The game's "
           "radar isn't touched.");
+    keybind::bind_row(ctx.app, input::ActionId::radar_enable, "On / off key");
     static constexpr const char* kCorners[] = {"Top left", "Top right", "Bottom left", "Bottom right"};
     ImGui::SetNextItemWidth(scaled(180.0f));
     combo("Corner", radar.corner, kCorners, 4);
@@ -75,6 +77,7 @@ void draw_bomb_timer(PageContext& ctx, settings::BombTimerSettings& timer)
     check("Enabled", &timer.enabled,
           "While a bomb is planted: a countdown at the top of the screen with the site, a bar, and who is defusing. "
           "Only in modes with a bomb (Casual, Competitive), not Deathmatch.");
+    keybind::bind_row(ctx.app, input::ActionId::bomb_timer_enable, "On / off key");
     ImGui::SetNextItemWidth(scaled(240.0f));
     ImGui::SliderFloat("Height", &timer.top, config::kBombTimerTop.min, config::kBombTimerTop.max,
                        "%.0f px from the top", ImGuiSliderFlags_AlwaysClamp);
@@ -92,6 +95,7 @@ void draw_spectators(PageContext& ctx, settings::SpectatorSettings& list)
           "Dead players watching you in first or third person. While you're dead and watch someone, it lists who else "
           "watches them. Bots spectate after their ~5 s death cam, so you'll see them in Casual or Competitive (in "
           "Deathmatch everyone respawns first).");
+    keybind::bind_row(ctx.app, input::ActionId::spectators_enable, "On / off key");
     static constexpr const char* kSides[] = {"Left", "Right"};
     ImGui::SetNextItemWidth(scaled(180.0f));
     combo("Side", list.side, kSides, 2);

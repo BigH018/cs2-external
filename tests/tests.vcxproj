@@ -97,6 +97,10 @@
     <ClCompile Include="maths\test_projection.cpp" />
     <ClCompile Include="maths\test_skeleton.cpp" />
     <ClCompile Include="settings\test_settings.cpp" />
+    <ClCompile Include="input\test_keys.cpp" />
+    <ClCompile Include="input\test_keybinds.cpp" />
+    <ClCompile Include="input\test_bind_capture.cpp" />
+    <ClCompile Include="input\test_key_tracker.cpp" />
     <ClCompile Include="test_color.cpp" />
   </ItemGroup>
   <ItemGroup Label="Sources under test">
@@ -130,6 +134,11 @@
     <ClCompile Include="..\src\external\features\triggerbot.cpp" />
     <ClCompile Include="..\src\external\game\writes.cpp" />
     <ClCompile Include="..\src\external\maths\angles.cpp" />
+    <ClCompile Include="..\src\external\input\keys.cpp" />
+    <ClCompile Include="..\src\external\input\actions.cpp" />
+    <ClCompile Include="..\src\external\input\keybinds.cpp" />
+    <ClCompile Include="..\src\external\input\bind_capture.cpp" />
+    <ClCompile Include="..\src\external\input\key_tracker.cpp" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

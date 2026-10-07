@@ -20,8 +20,8 @@ void draw_settings(PageContext& ctx)
                          "right on the edges of the game's picture, in windowed mode too.");
     widgets::card_end();
 
-    widgets::planned_card(ctx.fonts, "Phases 7-10",
-                          {"Keybinds for every action (Phase 7)", "Profiles and presets (Phase 8)",
-                           "Panic and exit keys (Phase 9)", "Menu size (Phase 10)"});
+    widgets::planned_card(ctx.fonts, "Phases 8-10",
+                          {"Profiles and presets (Phase 8)", "An exit button and the robustness pass (Phase 9)",
+                           "Menu size (Phase 10)"});
 }
 } // namespace ui::pages
