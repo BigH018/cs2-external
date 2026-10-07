@@ -86,6 +86,8 @@
     <ClCompile Include="features\test_radar.cpp" />
     <ClCompile Include="features\test_bomb_timer.cpp" />
     <ClCompile Include="game\test_bomb.cpp" />
+    <ClCompile Include="game\test_observer.cpp" />
+    <ClCompile Include="features\test_spectators.cpp" />
     <ClCompile Include="features\test_aimbot.cpp" />
     <ClCompile Include="features\test_triggerbot.cpp" />
     <ClCompile Include="game\test_bones.cpp" />
@@ -116,6 +118,9 @@
     <ClCompile Include="..\src\external\features\radar.cpp" />
     <ClCompile Include="..\src\external\features\bomb_timer.cpp" />
     <ClCompile Include="..\src\external\game\bomb.cpp" />
+    <ClCompile Include="..\src\external\game\observer.cpp" />
+    <ClCompile Include="..\src\external\features\spectators.cpp" />
+    <ClCompile Include="..\src\external\render\panel.cpp" />
     <ClCompile Include="..\src\external\game\bones.cpp" />
     <ClCompile Include="..\src\external\game\visibility.cpp" />
     <ClCompile Include="..\src\external\maths\projection.cpp" />

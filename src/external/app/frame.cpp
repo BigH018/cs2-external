@@ -16,6 +16,7 @@
 #include "features/bomb_timer.h"
 #include "features/esp.h"
 #include "features/radar.h"
+#include "features/spectators.h"
 #include "features/triggerbot.h"
 #include "game/bomb.h"
 #include "game/handle.h"
@@ -148,6 +149,7 @@ private:
         state_.active.triggerbot = settings.triggerbot.enabled;
         state_.active.radar = settings.radar.enabled;
         state_.active.bomb_timer = settings.bomb_timer.enabled;
+        state_.active.spectator_list = settings.spectators.enabled;
         read_game();
 
         // Aiming and firing only while you're playing: the game in front, the menu closed.
@@ -230,7 +232,7 @@ private:
     {
         const std::uint64_t now = GetTickCount64();
         const bool every_frame = state_.active.esp || state_.active.aimbot || state_.active.triggerbot ||
-                                 state_.active.radar || state_.active.bomb_timer;
+                                 state_.active.radar || state_.active.bomb_timer || state_.active.spectator_list;
         if (!every_frame && now < next_status_ms_)
         {
             return;
@@ -360,8 +362,8 @@ private:
         }
     }
 
-    // Under the watermark and the menu, on ImGui's background draw list: the ESP, the aimbot's FOV circle, the radar
-    // and the bomb timer.
+    // Under the watermark and the menu, on ImGui's background draw list: the ESP, the aimbot's FOV circle, the radar,
+    // the bomb timer and the spectator list.
     void draw_world()
     {
         const maths::Vec2 screen{static_cast<float>(state_.overlay_width), static_cast<float>(state_.overlay_height)};
@@ -382,6 +384,9 @@ private:
         const std::vector<render::Primitive> bomb =
             features::build_bomb_timer(state_.snapshot, state_.settings.bomb_timer, screen, font_size);
         primitives.insert(primitives.end(), bomb.begin(), bomb.end());
+        const std::vector<render::Primitive> spectators = features::build_spectator_list(
+            state_.snapshot, state_.settings.spectators, state_.settings.general.team_mode, screen, font_size);
+        primitives.insert(primitives.end(), spectators.begin(), spectators.end());
         render::paint(*ImGui::GetBackgroundDrawList(), primitives, imgui_.fonts().regular, font_size);
     }
 

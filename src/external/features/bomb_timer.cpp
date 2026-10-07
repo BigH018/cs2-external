@@ -2,32 +2,19 @@
 
 #include <algorithm>
 #include <format>
-#include <initializer_list>
 
 #include "config.h"
 #include "features/esp.h"
+#include "render/panel.h"
 
 namespace features
 {
 namespace
 {
-constexpr Color kBackground = Color::rgb(0x0E1220, 0.78f);
-constexpr Color kBorder = Color::rgb(0x8CC4CF, 0.55f);
-constexpr Color kBarBack{0.0f, 0.0f, 0.0f, 0.6f};
-constexpr Color kText = Color::rgb(0xEDEBF7);
-constexpr Color kDim = Color::rgb(0xEDEBF7, 0.65f);
 constexpr Color kGood = Color::rgb(0x5CD65C);
 constexpr Color kWarn = Color::rgb(0xF2D45C);
 constexpr Color kBad = Color::rgb(0xF25C5C);
 constexpr Color kDefuse = Color::rgb(0x5CA8F2);
-constexpr float kRowGap = 4.0f;
-
-// A vertical line across a bar at `fraction` of its width (the countdown bar's latest-defuse marks).
-struct BarMark
-{
-    float fraction;
-    Color colour;
-};
 
 Color verdict_colour(DefuseVerdict verdict) noexcept
 {
@@ -56,57 +43,6 @@ float fraction(float left, float total) noexcept
     return total > 0.0f ? std::clamp(left / total, 0.0f, 1.0f) : 0.0f;
 }
 
-// Rows top to bottom inside the panel; the background is added under them once their height is known.
-class PanelWriter
-{
-public:
-    PanelWriter(std::vector<render::Primitive>& out, float left, float top, float line_height)
-        : out_(out), left_(left + config::kBombPanelPadding),
-          right_(left + config::kBombPanelWidth - config::kBombPanelPadding), y_(top + config::kBombPanelPadding),
-          line_height_(line_height)
-    {
-    }
-
-    void text(const std::string& left, Color left_colour, const std::string& right = {}, Color right_colour = kText)
-    {
-        out_.push_back(render::Text{{left_, y_}, left, left_colour, render::TextAnchor::top_left});
-        if (!right.empty())
-        {
-            out_.push_back(render::Text{{right_, y_}, right, right_colour, render::TextAnchor::top_right});
-        }
-        y_ += line_height_ + kRowGap;
-    }
-
-    void bar(float filled, Color colour, std::initializer_list<BarMark> marks = {})
-    {
-        const float end = left_ + (right_ - left_) * std::clamp(filled, 0.0f, 1.0f);
-        out_.push_back(render::FilledRect{{left_, y_}, {right_, y_ + config::kBombBarHeight}, kBarBack});
-        out_.push_back(render::FilledRect{{left_, y_}, {end, y_ + config::kBombBarHeight}, colour});
-        for (const BarMark& mark : marks)
-        {
-            if (mark.fraction <= 0.0f || mark.fraction >= 1.0f)
-            {
-                continue;
-            }
-            const float x = left_ + (right_ - left_) * mark.fraction;
-            const maths::Vec2 top{x, y_ - config::kBombMarkOverhang};
-            const maths::Vec2 bottom{x, y_ + config::kBombBarHeight + config::kBombMarkOverhang};
-            out_.push_back(render::Line{top, bottom, kBarBack, config::kBombMarkThickness + 2.0f});
-            out_.push_back(render::Line{top, bottom, mark.colour, config::kBombMarkThickness});
-        }
-        y_ += config::kBombBarHeight + kRowGap;
-    }
-
-    // The bottom of the last row plus the padding (the gap after the last row stands in for part of it).
-    [[nodiscard]] float bottom() const noexcept { return y_ - kRowGap + config::kBombPanelPadding; }
-
-private:
-    std::vector<render::Primitive>& out_;
-    float left_;
-    float right_;
-    float y_;
-    float line_height_;
-};
 } // namespace
 
 DefuseVerdict defuse_verdict(float seconds_left) noexcept
@@ -174,8 +110,7 @@ std::vector<render::Primitive> build_bomb_timer(const game::GameSnapshot& game,
     }
     const float left = (screen.x - config::kBombPanelWidth) * 0.5f;
     const float top = config::kBombTimerTop.clamp(settings.top);
-    out.push_back(render::FilledRect{}); // the background, filled in once the height is known
-    PanelWriter panel(out, left, top, line_height);
+    render::PanelWriter panel(out, {left, top}, config::kBombPanelWidth, line_height);
 
     const std::string title = std::format("BOMB {}", info->site);
     switch (info->phase)
@@ -189,8 +124,8 @@ std::vector<render::Primitive> build_bomb_timer(const game::GameSnapshot& game,
         panel.text(title, colour, std::format("{:.1f} s", info->seconds_left), colour);
         // The latest moments a defuse can start: without a kit (10 s left), with one (5 s left).
         panel.bar(info->fraction_left, colour,
-                  {BarMark{fraction(config::kDefuseSecondsNoKit, info->timer_length), kWarn},
-                   BarMark{fraction(config::kDefuseSecondsKit, info->timer_length), kBad}});
+                  {render::BarMark{fraction(config::kDefuseSecondsNoKit, info->timer_length), kWarn},
+                   render::BarMark{fraction(config::kDefuseSecondsKit, info->timer_length), kBad}});
         if (info->phase == BombPhase::defusing)
         {
             const std::string who = info->defuser.empty() ? "Defusing" : "Defusing: " + info->defuser;
@@ -208,13 +143,9 @@ std::vector<render::Primitive> build_bomb_timer(const game::GameSnapshot& game,
     }
     if (settings.distance && info->distance_metres)
     {
-        panel.text(std::format("{:.0f} m from you", *info->distance_metres), kDim);
+        panel.text(std::format("{:.0f} m from you", *info->distance_metres), render::kPanelDim);
     }
-
-    const maths::Vec2 min{left, top};
-    const maths::Vec2 max{left + config::kBombPanelWidth, panel.bottom()};
-    out.front() = render::FilledRect{min, max, kBackground};
-    out.insert(out.begin() + 1, render::Rect{min, max, kBorder, 1.5f});
+    panel.finish();
     return out;
 }
 } // namespace features

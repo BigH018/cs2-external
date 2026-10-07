@@ -7,6 +7,7 @@
 #include "config.h"
 #include "core/log.h"
 #include "core/runtime.h"
+#include "features/spectators.h"
 #include "game/player.h"
 #include "game/weapon.h"
 #include "maths/vec.h"
@@ -31,8 +32,35 @@ std::string weapon_text(const game::PlayerSnapshot& player)
     return info.name.empty() ? std::format("#{}", *player.weapon_id) : std::string(info.name);
 }
 
-std::string player_row(const game::PlayerSnapshot& player, const game::PlayerSnapshot* local)
+// A dead player's camera: "watching Kev (1st person)", "free camera", or "" (alive, death cam).
+std::string observer_text(const game::PlayerSnapshot& player, const game::GameSnapshot& snapshot)
 {
+    if (player.alive || player.observer_mode == game::ObserverMode::none)
+    {
+        return "";
+    }
+    if (player.observer_mode == game::ObserverMode::roaming)
+    {
+        return "free camera ";
+    }
+    if (!game::watches_target(player.observer_mode))
+    {
+        return "";
+    }
+    std::string target = "?";
+    for (const game::PlayerSnapshot& other : snapshot.players)
+    {
+        if (player.observer_target != 0 && other.pawn == player.observer_target)
+        {
+            target = other.is_local ? "YOU" : other.name;
+        }
+    }
+    return std::format("watching {} ({}) ", target, features::observer_mode_name(player.observer_mode));
+}
+
+std::string player_row(const game::PlayerSnapshot& player, const game::GameSnapshot& snapshot)
+{
+    const game::PlayerSnapshot* local = snapshot.local();
     std::string state = "no pawn";
     if (player.pawn != 0)
     {
@@ -60,6 +88,7 @@ std::string player_row(const game::PlayerSnapshot& player, const game::PlayerSna
     {
         notes += "in air ";
     }
+    notes += observer_text(player, snapshot);
     return std::format("{:>3}  {:<4} {:<20.20} {:<7} {:>4} {:>4}  {:<14.14} {:>8.0f} {:>8.0f} {:>7.0f}  {:>8}  {}",
                        player.index, game::team_short_name(player.team), player.name, state, player.health,
                        player.armor, weapon_text(player), player.origin.x, player.origin.y, player.origin.z,
@@ -109,10 +138,9 @@ std::vector<std::string> format_live_view(const game::GameSnapshot& snapshot, do
     lines.emplace_back();
     lines.push_back(std::format("{:>3}  {:<4} {:<20} {:<7} {:>4} {:>4}  {:<14} {:>8} {:>8} {:>7}  {:>8}  {}", "#",
                                 "TEAM", "NAME", "STATE", "HP", "ARM", "WEAPON", "X", "Y", "Z", "DIST", "NOTES"));
-    const game::PlayerSnapshot* local = snapshot.local();
     for (const game::PlayerSnapshot& player : snapshot.players)
     {
-        lines.push_back(player_row(player, local));
+        lines.push_back(player_row(player, snapshot));
     }
     return lines;
 }

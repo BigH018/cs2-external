@@ -67,6 +67,18 @@ TEST_CASE("Settings defaults: bomb timer off, inside its range")
     CHECK(timer.distance);
 }
 
+TEST_CASE("Settings defaults: spectator list off, on the right under the radar, inside its range")
+{
+    const settings::Settings defaults;
+    const settings::SpectatorSettings& list = defaults.spectators;
+    CHECK_FALSE(list.enabled);
+    CHECK(list.side == settings::PanelSide::right);
+    CHECK(config::kSpectatorTop.contains(list.top));
+    CHECK(list.top > config::kRadarMargin + defaults.radar.size); // clear of the default radar (top right)
+    CHECK(list.show_mode);
+    CHECK_FALSE(list.hide_when_empty);
+}
+
 TEST_CASE("input::kBindableKeys: names and indices")
 {
     CHECK(input::key_name(0x01) == "Mouse 1");

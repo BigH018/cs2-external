@@ -68,6 +68,9 @@
     <ClCompile Include="features\radar.cpp" />
     <ClCompile Include="features\bomb_timer.cpp" />
     <ClCompile Include="game\bomb.cpp" />
+    <ClCompile Include="game\observer.cpp" />
+    <ClCompile Include="features\spectators.cpp" />
+    <ClCompile Include="render\panel.cpp" />
     <ClCompile Include="features\targeting.cpp" />
     <ClCompile Include="features\triggerbot.cpp" />
     <ClCompile Include="game\bones.cpp" />
@@ -121,6 +124,9 @@
     <ClInclude Include="features\radar.h" />
     <ClInclude Include="features\bomb_timer.h" />
     <ClInclude Include="game\bomb.h" />
+    <ClInclude Include="game\observer.h" />
+    <ClInclude Include="features\spectators.h" />
+    <ClInclude Include="render\panel.h" />
     <ClInclude Include="features\targeting.h" />
     <ClInclude Include="features\triggerbot.h" />
     <ClInclude Include="game\bones.h" />

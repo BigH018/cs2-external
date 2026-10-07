@@ -6,6 +6,7 @@
 #include "config.h"
 #include "game/bones.h"
 #include "game/handle.h"
+#include "game/observer.h"
 #include "game/offsets.h"
 #include "game/schema.h"
 #include "game/view.h"
@@ -100,6 +101,15 @@ std::optional<PlayerSnapshot> read_player(const core::Memory& memory, std::uintp
     {
         read_pawn(memory, entity_system, pawn, controller_alive, player);
         player.pawn_index = player.pawn != 0 ? handle_index(*pawn_handle) : 0;
+    }
+    // Only a dead player spectates; a living one's observer mode and target are left over from earlier.
+    if (!controller_alive)
+    {
+        if (const auto observer = read_observer(memory, entity_system, controller.entity))
+        {
+            player.observer_mode = observer->mode;
+            player.observer_target = observer->target;
+        }
     }
     return player;
 }

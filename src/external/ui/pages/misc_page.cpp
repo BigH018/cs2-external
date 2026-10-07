@@ -84,6 +84,26 @@ void draw_bomb_timer(PageContext& ctx, settings::BombTimerSettings& timer)
     check("Distance", &timer.distance, "How far you are from the bomb.");
     widgets::card_end();
 }
+
+void draw_spectators(PageContext& ctx, settings::SpectatorSettings& list)
+{
+    widgets::card_begin(ctx.fonts, "Spectator list");
+    check("Enabled", &list.enabled,
+          "Dead players watching you in first or third person. While you're dead and watch someone, it lists who else "
+          "watches them. Bots spectate after their ~5 s death cam, so you'll see them in Casual or Competitive (in "
+          "Deathmatch everyone respawns first).");
+    static constexpr const char* kSides[] = {"Left", "Right"};
+    ImGui::SetNextItemWidth(scaled(180.0f));
+    combo("Side", list.side, kSides, 2);
+    ImGui::SetNextItemWidth(scaled(240.0f));
+    ImGui::SliderFloat("Height", &list.top, config::kSpectatorTop.min, config::kSpectatorTop.max,
+                       "%.0f px from the top", ImGuiSliderFlags_AlwaysClamp);
+    ImGui::SameLine();
+    widgets::help_marker("The default sits under the radar (top right).");
+    check("Show the camera", &list.show_mode, "\"1st person\" or \"3rd person\" next to each name.");
+    check("Hide when nobody watches", &list.hide_when_empty, "Off: the panel says \"Nobody\" instead.");
+    widgets::card_end();
+}
 } // namespace
 
 void draw_misc(PageContext& ctx)
@@ -93,7 +113,7 @@ void draw_misc(PageContext& ctx)
     draw_radar(ctx, radar);
     draw_radar_colours(ctx, radar);
     draw_bomb_timer(ctx, ctx.app.settings.bomb_timer);
-    widgets::planned_card(ctx.fonts, "Coming next (Phase 6)",
-                          {"Spectator list", "Hitsound (played by the overlay, not the game)"});
+    draw_spectators(ctx, ctx.app.settings.spectators);
+    widgets::planned_card(ctx.fonts, "Coming next (Phase 6)", {"Hitsound (played by the overlay, not the game)"});
 }
 } // namespace ui::pages

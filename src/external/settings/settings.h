@@ -212,6 +212,23 @@ struct BombTimerSettings
     bool distance = true;     // how far you are from the bomb
 };
 
+// Which side of the game window a panel sits on.
+enum class PanelSide : std::uint8_t
+{
+    left,
+    right,
+};
+
+// Who is watching you (or, while you're dead, the player you watch): dead players spectating in first or third person.
+struct SpectatorSettings
+{
+    bool enabled = false;
+    PanelSide side = PanelSide::right;
+    float top = 290.0f;           // pixels from the top of the game window, under the radar (config::kSpectatorTop)
+    bool show_mode = true;        // "1st person" / "3rd person" next to each name
+    bool hide_when_empty = false; // no panel while nobody watches
+};
+
 struct Settings
 {
     OverlaySettings overlay;
@@ -221,5 +238,6 @@ struct Settings
     TriggerbotSettings triggerbot;
     RadarSettings radar;
     BombTimerSettings bomb_timer;
+    SpectatorSettings spectators;
 };
 } // namespace settings

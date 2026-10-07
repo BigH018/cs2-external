@@ -103,6 +103,7 @@ inline constexpr Range<float> kRadarSize{150.0f, 600.0f};    // pixels
 inline constexpr Range<float> kRadarRange{10.0f, 150.0f};    // metres from the centre to the edge
 inline constexpr Range<float> kRadarDotSize{2.0f, 8.0f};     // pixels (radius)
 inline constexpr Range<float> kBombTimerTop{0.0f, 1000.0f};  // pixels from the top of the game window
+inline constexpr Range<float> kSpectatorTop{0.0f, 1000.0f};  // pixels from the top of the game window
 
 // --- Aimbot and triggerbot (Phase 5) -------------------------------------------------------------------------------
 // Smoothing is defined per 60 Hz frame (1 / smoothing of the remaining angle each 1/60 s), then scaled to the real
@@ -139,10 +140,17 @@ inline constexpr float kMaxBombTimer = 120.0f;               // a fuse longer th
 inline constexpr float kDefuseSecondsNoKit = 10.0f;          // CS2's defuse times
 inline constexpr float kDefuseSecondsKit = 5.0f;
 inline constexpr float kBombPanelWidth = 250.0f;             // pixels
-inline constexpr float kBombPanelPadding = 8.0f;
-inline constexpr float kBombBarHeight = 6.0f;
-inline constexpr float kBombMarkOverhang = 3.0f;  // the latest-defuse marks stick out this far above and below the bar
-inline constexpr float kBombMarkThickness = 2.0f;
+
+// --- Spectator list (Phase 6) --------------------------------------------------------------------------------------
+inline constexpr float kSpectatorPanelWidth = 230.0f; // pixels
+inline constexpr float kSpectatorMargin = 10.0f;      // pixels from the left or right edge of the game window
+
+// --- Panels (render/panel: the bomb timer, the spectator list) -----------------------------------------------------
+inline constexpr float kPanelPadding = 8.0f;
+inline constexpr float kPanelRowGap = 4.0f;
+inline constexpr float kPanelBarHeight = 6.0f;
+inline constexpr float kPanelMarkOverhang = 3.0f; // a bar's marks stick out this far above and below it
+inline constexpr float kPanelMarkThickness = 2.0f;
 
 // --- Timing --------------------------------------------------------------------------------------------------------
 inline constexpr std::uint32_t kStatusIntervalMs = 250;     // match status read on the Home page (~4 Hz)

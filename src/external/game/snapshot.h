@@ -30,6 +30,23 @@ enum class Team : std::uint8_t
 // m_fFlags bits (Source engine player flags).
 inline constexpr std::uint32_t kFlagOnGround = 1u << 0;
 
+// How a dead player spectates (ObserverMode_t, from the server.dll dump; the client field is a uint8). Proven live
+// 2026-10-07: a bot that dies is `roaming` without a target for ~5 s (the death cam), then `in_eye` on a player pawn.
+enum class ObserverMode : std::uint8_t
+{
+    none = 0,
+    fixed = 1,
+    in_eye = 2,  // first person
+    chase = 3,   // third person
+    roaming = 4, // free camera
+};
+
+// First or third person: the modes in which the target is the one being watched.
+[[nodiscard]] constexpr bool watches_target(ObserverMode mode) noexcept
+{
+    return mode == ObserverMode::in_eye || mode == ObserverMode::chase;
+}
+
 struct PlayerSnapshot
 {
     std::uint32_t index = 0;       // controller entity index; player slot = index - 1
@@ -54,6 +71,10 @@ struct PlayerSnapshot
     std::optional<std::uint16_t> weapon_id;
     std::uint64_t spotted_by_mask = 0;  // a bit per player slot that can see this pawn (game/visibility)
     std::optional<maths::Bones> bones;  // world positions (maths/skeleton.h), if the bone array read sanely
+
+    // While dead (the controller says so): how this player spectates and whom (game/observer). Living players: none, 0.
+    ObserverMode observer_mode = ObserverMode::none;
+    std::uintptr_t observer_target = 0; // the pawn being watched, 0 = none (or a stale handle)
 
     [[nodiscard]] maths::Vec3 eye_position() const noexcept { return origin + view_offset; }
     // The middle of the head: bone::kHeadCentre if the bones were read, otherwise the eye position.

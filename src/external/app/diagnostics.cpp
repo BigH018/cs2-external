@@ -18,6 +18,7 @@
 #include "game/bomb.h"
 #include "game/handle.h"
 #include "game/interfaces.h"
+#include "game/observer.h"
 #include "game/offsets.h"
 #include "game/player.h"
 #include "game/schema.h"
@@ -301,9 +302,44 @@ void check_bomb(Tally& tally, const core::Memory& memory, const core::ModuleInfo
                                              .value_or(0)));
 }
 
+// The spectator list's chain: every controller -> observer pawn -> observer services (alive or not), and every dead
+// player watching someone in first or third person watches a player's pawn.
+void check_observers(Tally& tally, const core::Memory& memory, const core::ModuleInfo& client,
+                     const game::GameSnapshot& game)
+{
+    const auto entity_system = game::read_entity_system(memory, client.base);
+    int readable = 0;
+    int dead = 0;
+    int watching = 0;
+    int watching_players = 0;
+    for (const game::PlayerSnapshot& player : game.players)
+    {
+        if (entity_system && game::read_observer(memory, *entity_system, player.controller))
+        {
+            ++readable;
+        }
+        if (player.alive)
+        {
+            continue;
+        }
+        ++dead;
+        if (game::watches_target(player.observer_mode) && player.observer_target != 0)
+        {
+            ++watching;
+            const bool is_pawn = std::ranges::any_of(game.players, [&](const game::PlayerSnapshot& other)
+                                                     { return other.pawn == player.observer_target; });
+            watching_players += is_pawn ? 1 : 0;
+        }
+    }
+    const int players = static_cast<int>(game.players.size());
+    tally.check(readable == players && watching_players == watching,
+                std::format("{:<26} {} of {} controllers; {} dead, {} watching a player ({} of them a known pawn)",
+                            "Observer services", readable, players, dead, watching, watching_players));
+}
+
 // --- 6. Match reads (only in a match) ------------------------------------------------------------------------------
-// The hand-found layouts the dumps can't vouch for (CGlobalVars, the bone array), checked on live players, and the
-// planted bomb when there is one.
+// The hand-found layouts the dumps can't vouch for (CGlobalVars, the bone array), checked on live players, the
+// observer chain, and the planted bomb when there is one.
 void check_match(Tally& tally, const core::Memory& memory, const core::ModuleInfo& client)
 {
     const game::GameSnapshot game = game::read_game(memory, client.base);
@@ -312,7 +348,7 @@ void check_match(Tally& tally, const core::Memory& memory, const core::ModuleInf
         logger::info("Match reads: not in a match, skipped (join Practice with Bots to check globals and bones)");
         return;
     }
-    logger::info("Match reads (hand-found layouts: CGlobalVars, bones; the bomb)");
+    logger::info("Match reads (hand-found layouts: CGlobalVars, bones; observers; the bomb)");
     const game::GlobalVars& globals = game.globals;
     tally.check(globals.is_sane(), std::format("{:<26} map {}, max clients {}, tick interval {:.4f}", "CGlobalVars",
                                                globals.map_name.empty() ? "?" : globals.map_name, globals.max_clients,
@@ -344,6 +380,7 @@ void check_match(Tally& tally, const core::Memory& memory, const core::ModuleInf
                 std::format("{:<26} {} of {} alive players; head bone {:.0f} to {:.0f} units above the feet",
                             "Bones (model state + 0x80)", with_bones, alive, with_bones > 0 ? lowest_head : 0.0f,
                             with_bones > 0 ? highest_head : 0.0f));
+    check_observers(tally, memory, client, game);
     check_bomb(tally, memory, client, globals);
 }
 } // namespace

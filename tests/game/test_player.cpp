@@ -201,6 +201,38 @@ TEST_CASE("read_player: dead, in the air, no pawn")
     CHECK_FALSE(no_pawn->weapon_id.has_value());
 }
 
+TEST_CASE("read_player: a dead player's observer camera is read, a living player's left-over one isn't")
+{
+    test::FakeMemory memory;
+    FakeEntityList list(memory);
+    add_player(memory, list, FakePlayer{.index = 3, .alive = false, .health = 0});
+    add_player(memory, list, FakePlayer{.index = 4});
+    const std::uint32_t watched = FakeEntityList::make_handle(104, 0x204); // player 4's pawn
+    for (const std::uint32_t index : {3u, 4u})
+    {
+        // Every controller has an observer pawn with services, alive or not (as in the game).
+        const std::uintptr_t observer_pawn = object(index, 0x50000);
+        const std::uintptr_t services = object(index, 0x60000);
+        memory.map(observer_pawn, 0x2000);
+        memory.map(services, 0x100);
+        memory.put<std::uint32_t>(object(index, kController) + schema::CCSPlayerController::m_hObserverPawn,
+                                  list.add(150 + index, observer_pawn, 0x400 + index));
+        memory.put<std::uintptr_t>(observer_pawn + schema::C_BasePlayerPawn::m_pObserverServices, services);
+        memory.put<std::uint8_t>(services + schema::CPlayer_ObserverServices::m_iObserverMode, 2);
+        memory.put<std::uint32_t>(services + schema::CPlayer_ObserverServices::m_hObserverTarget, watched);
+    }
+
+    const auto dead = game::read_player(memory, FakeEntityList::kSystem, controller_ref(3), 0);
+    REQUIRE(dead.has_value());
+    CHECK(dead->observer_mode == game::ObserverMode::in_eye);
+    CHECK(dead->observer_target == object(4, kPawn));
+
+    const auto alive = game::read_player(memory, FakeEntityList::kSystem, controller_ref(4), 0);
+    REQUIRE(alive.has_value());
+    CHECK(alive->observer_mode == game::ObserverMode::none);
+    CHECK(alive->observer_target == 0);
+}
+
 TEST_CASE("read_player: health 100 but the controller says dead is not alive")
 {
     test::FakeMemory memory;

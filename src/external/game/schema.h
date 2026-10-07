@@ -64,14 +64,24 @@ inline constexpr std::uintptr_t m_vecViewOffset = 0xF60; // 3936, CNetworkViewOf
 
 namespace C_BasePlayerPawn
 {
-inline constexpr std::uintptr_t m_pWeaponServices = 0x12F0; // 4848, CPlayer_WeaponServices*
-inline constexpr std::uintptr_t m_hController     = 0x14BC; // 5308, CHandle<CBasePlayerController>
+inline constexpr std::uintptr_t m_pWeaponServices   = 0x12F0; // 4848, CPlayer_WeaponServices*
+inline constexpr std::uintptr_t m_pObserverServices = 0x1308; // 4872, CPlayer_ObserverServices* (on the observer pawn)
+inline constexpr std::uintptr_t m_hController       = 0x14BC; // 5308, CHandle<CBasePlayerController>
 } // namespace C_BasePlayerPawn
 
 namespace CPlayer_WeaponServices
 {
 inline constexpr std::uintptr_t m_hActiveWeapon = 0x60; // 96, CHandle<C_BasePlayerWeapon>
 } // namespace CPlayer_WeaponServices
+
+// Who a player spectates. Phase 6: the spectator list. Read from the controller's observer pawn (m_hObserverPawn): the
+// player pawn's own pointer is null on the client (proven live 2026-10-07). Only meaningful while the player is dead:
+// living players keep a stale mode and target.
+namespace CPlayer_ObserverServices
+{
+inline constexpr std::uintptr_t m_iObserverMode   = 0x48; // 72, uint8 (ObserverMode_t: 2 = in-eye, 3 = chase)
+inline constexpr std::uintptr_t m_hObserverTarget = 0x4C; // 76, CHandle<C_BaseEntity> (a player pawn)
+} // namespace CPlayer_ObserverServices
 
 namespace C_CSPlayerPawnBase
 {
@@ -104,8 +114,9 @@ inline constexpr std::uintptr_t m_iszPlayerName = 0x6FC; // 1788, char[128]
 
 namespace CCSPlayerController
 {
-inline constexpr std::uintptr_t m_hPlayerPawn  = 0x92C; // 2348, CHandle<C_CSPlayerPawn>
-inline constexpr std::uintptr_t m_bPawnIsAlive = 0x934; // 2356, bool
+inline constexpr std::uintptr_t m_hPlayerPawn   = 0x92C; // 2348, CHandle<C_CSPlayerPawn>
+inline constexpr std::uintptr_t m_hObserverPawn = 0x930; // 2352, CHandle<C_CSObserverPawn>
+inline constexpr std::uintptr_t m_bPawnIsAlive  = 0x934; // 2356, bool
 } // namespace CCSPlayerController
 
 // The active weapon's item definition index: weapon + m_AttributeManager + m_Item + m_iItemDefinitionIndex
@@ -171,8 +182,11 @@ inline constexpr std::array kFields{
     Field{"CSkeletonInstance", "m_modelState", CSkeletonInstance::m_modelState},
     Field{"C_BaseModelEntity", "m_vecViewOffset", C_BaseModelEntity::m_vecViewOffset},
     Field{"C_BasePlayerPawn", "m_pWeaponServices", C_BasePlayerPawn::m_pWeaponServices},
+    Field{"C_BasePlayerPawn", "m_pObserverServices", C_BasePlayerPawn::m_pObserverServices},
     Field{"C_BasePlayerPawn", "m_hController", C_BasePlayerPawn::m_hController},
     Field{"CPlayer_WeaponServices", "m_hActiveWeapon", CPlayer_WeaponServices::m_hActiveWeapon},
+    Field{"CPlayer_ObserverServices", "m_iObserverMode", CPlayer_ObserverServices::m_iObserverMode},
+    Field{"CPlayer_ObserverServices", "m_hObserverTarget", CPlayer_ObserverServices::m_hObserverTarget},
     Field{"C_CSPlayerPawnBase", "m_flFlashOverlayAlpha", C_CSPlayerPawnBase::m_flFlashOverlayAlpha},
     Field{"C_CSPlayerPawnBase", "m_flFlashMaxAlpha", C_CSPlayerPawnBase::m_flFlashMaxAlpha},
     Field{"C_CSPlayerPawnBase", "m_flFlashDuration", C_CSPlayerPawnBase::m_flFlashDuration},
@@ -187,6 +201,7 @@ inline constexpr std::array kFields{
     Field{"CBasePlayerController", "m_hPawn", CBasePlayerController::m_hPawn},
     Field{"CBasePlayerController", "m_iszPlayerName", CBasePlayerController::m_iszPlayerName},
     Field{"CCSPlayerController", "m_hPlayerPawn", CCSPlayerController::m_hPlayerPawn},
+    Field{"CCSPlayerController", "m_hObserverPawn", CCSPlayerController::m_hObserverPawn},
     Field{"CCSPlayerController", "m_bPawnIsAlive", CCSPlayerController::m_bPawnIsAlive},
     Field{"C_EconEntity", "m_AttributeManager", C_EconEntity::m_AttributeManager},
     Field{"C_AttributeContainer", "m_Item", C_AttributeContainer::m_Item},
