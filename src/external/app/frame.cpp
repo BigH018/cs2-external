@@ -1,8 +1,14 @@
 #include "app/frame.h"
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
+#include <format>
 #include <optional>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include <imgui.h>
@@ -29,6 +35,8 @@
 #include "maths/vec.h"
 #include "render/painter.h"
 #include "render/primitives.h"
+#include "settings/presets.h"
+#include "settings/profile_store.h"
 #include "ui/hud.h"
 #include "ui/imgui_layer.h"
 #include "ui/menu.h"
@@ -51,6 +59,51 @@ bool client_area(HWND window, RECT& area) noexcept
     return client.right > 0 && client.bottom > 0;
 }
 
+// <folder of cs2_external.exe>\profiles.
+std::filesystem::path profiles_folder()
+{
+    std::wstring path(MAX_PATH, L'\0');
+    for (;;)
+    {
+        const DWORD length = GetModuleFileNameW(nullptr, path.data(), static_cast<DWORD>(path.size()));
+        if (length == 0)
+        {
+            return std::filesystem::path(config::kProfilesFolder); // next to wherever we were started from
+        }
+        if (length < path.size())
+        {
+            path.resize(length);
+            break;
+        }
+        path.resize(path.size() * 2); // truncated: the exe's path is longer than MAX_PATH
+    }
+    return std::filesystem::path(path).parent_path() / config::kProfilesFolder;
+}
+
+std::string utf8(const std::filesystem::path& path)
+{
+    const std::u8string text = path.u8string();
+    return std::string(text.begin(), text.end());
+}
+
+// Profile names are file names: Windows doesn't tell "Rage" and "rage" apart.
+bool same_profile(const std::string& a, const std::string& b)
+{
+    const std::optional<std::string> clean = settings::ProfileStore::clean_name(a);
+    return clean && clean->size() == b.size() &&
+           std::equal(clean->begin(), clean->end(), b.begin(), [](char x, char y) {
+               return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));
+           });
+}
+
+// Each preset's key (Keybinds page, Presets).
+constexpr std::pair<input::ActionId, settings::Preset> kPresetActions[] = {
+    {input::ActionId::preset_off, settings::Preset::off},
+    {input::ActionId::preset_chill, settings::Preset::chill},
+    {input::ActionId::preset_medium, settings::Preset::medium},
+    {input::ActionId::preset_rage, settings::Preset::rage},
+};
+
 class Runner
 {
 public:
@@ -62,6 +115,7 @@ public:
 
     int run()
     {
+        load_startup_profile(); // before anything reads the settings (the keys logged below come from it)
         if (!overlay_.create(&ui::imgui_message_hook) ||
             !imgui_.init(overlay_.hwnd(), overlay_.device(), overlay_.context()))
         {
@@ -159,6 +213,7 @@ private:
         {
             return true;
         }
+        run_requests(); // profile operations and presets the menu (or a preset key) asked for
         const settings::Settings& settings = state_.settings;
         state_.active.esp = settings.esp.enabled;
         state_.active.aimbot = settings.aimbot.enabled;
@@ -346,6 +401,162 @@ private:
         flip(input::ActionId::radar_enable, settings.radar.enabled, "Radar");
         flip(input::ActionId::bomb_timer_enable, settings.bomb_timer.enabled, "Bomb timer");
         flip(input::ActionId::spectators_enable, settings.spectators.enabled, "Spectator list");
+        for (const auto& [id, preset] : kPresetActions)
+        {
+            if (actions_.did_fire(id))
+            {
+                state_.requests.preset = preset;
+            }
+        }
+    }
+
+    // --- Profiles and presets (Phase 8) ----------------------------------------------------------------------------
+
+    // The last used profile (or "default") becomes the settings.
+    void load_startup_profile()
+    {
+        profile_store_.emplace(profiles_folder());
+        state_.profiles.folder = utf8(profile_store_->folder());
+        use_profile(profile_store_->load_startup());
+        refresh_profile_list();
+        logger::info("Profile \"{}\" loaded ({} warnings) from {}", state_.profiles.current,
+                     state_.profiles.warnings.size(), state_.profiles.folder);
+    }
+
+    // Make `loaded` the current profile: its settings apply now and are remembered as saved.
+    void use_profile(settings::LoadedProfile loaded)
+    {
+        for (const std::string& warning : loaded.warnings)
+        {
+            logger::warn("Profile {}: {}", loaded.name, warning);
+        }
+        state_.settings = loaded.settings;
+        state_.profiles.saved = std::move(loaded.settings);
+        state_.profiles.current = std::move(loaded.name);
+        state_.profiles.warnings = std::move(loaded.warnings);
+        settings_replaced();
+    }
+
+    // The whole settings changed at once (a profile, a reset): no toggle key stays on, no capture keeps running.
+    void settings_replaced()
+    {
+        keybinds_.reset_toggles();
+        state_.capture.cancel();
+    }
+
+    void refresh_profile_list() { state_.profiles.names = profile_store_->list(); }
+
+    // The result line on the Settings page, and the console.
+    void report(const settings::ProfileStatus& status, const std::string& success_text)
+    {
+        state_.profiles.message = status.ok ? success_text : status.message;
+        state_.profiles.message_failed = !status.ok;
+        if (status.ok)
+        {
+            logger::info("{}", state_.profiles.message);
+        }
+        else
+        {
+            logger::warn("{}", state_.profiles.message);
+        }
+    }
+
+    void run_requests()
+    {
+        if (const std::optional<ProfileRequest> request = std::exchange(state_.requests.profile, std::nullopt))
+        {
+            run_profile_request(*request);
+        }
+        if (const std::optional<settings::Preset> preset = std::exchange(state_.requests.preset, std::nullopt))
+        {
+            settings::apply_preset(state_.settings, *preset);
+            report(settings::ProfileStatus::success(),
+                   std::format("Preset {} applied (Save to keep it)", settings::preset_name(*preset)));
+        }
+    }
+
+    void run_profile_request(const ProfileRequest& request)
+    {
+        settings::ProfileStore& store = *profile_store_;
+        ProfileState& profiles = state_.profiles;
+        switch (request.op)
+        {
+        case ProfileOp::load:
+        {
+            settings::LoadedProfile loaded;
+            const settings::ProfileStatus status = store.load(request.name, loaded);
+            if (!status.ok)
+            {
+                report(status, {});
+                break;
+            }
+            const std::size_t warnings = loaded.warnings.size();
+            use_profile(std::move(loaded));
+            store.set_last_profile(profiles.current);
+            report(status, warnings == 0 ? std::format("Profile \"{}\" loaded", profiles.current)
+                                         : std::format("Profile \"{}\" loaded with {} warnings (listed below)",
+                                                       profiles.current, warnings));
+            break;
+        }
+        case ProfileOp::save:
+        {
+            const settings::ProfileStatus status = store.save(profiles.current, state_.settings);
+            if (status.ok)
+            {
+                profiles.saved = state_.settings;
+                store.set_last_profile(profiles.current);
+            }
+            report(status, std::format("Profile \"{}\" saved", profiles.current));
+            break;
+        }
+        case ProfileOp::save_as:
+        {
+            const std::optional<std::string> name = settings::ProfileStore::clean_name(request.name);
+            const settings::ProfileStatus status =
+                name && store.exists(*name)
+                    ? settings::ProfileStatus::failure("Profile \"" + *name + "\" already exists: load it and Save")
+                    : store.save(request.name, state_.settings);
+            if (status.ok)
+            {
+                profiles.current = *name;
+                profiles.saved = state_.settings;
+                profiles.warnings.clear();
+                store.set_last_profile(profiles.current);
+            }
+            report(status, std::format("Saved as \"{}\"", profiles.current));
+            break;
+        }
+        case ProfileOp::rename:
+        {
+            const settings::ProfileStatus status = store.rename(profiles.current, request.name);
+            if (status.ok)
+            {
+                profiles.current = *settings::ProfileStore::clean_name(request.name);
+            }
+            report(status, std::format("Renamed to \"{}\"", profiles.current));
+            break;
+        }
+        case ProfileOp::remove:
+        {
+            const settings::ProfileStatus status = store.remove(request.name);
+            if (status.ok && same_profile(request.name, profiles.current))
+            {
+                // The loaded profile is gone: the settings stay, but now belong to nothing saved.
+                profiles.current = config::kDefaultProfile;
+                profiles.saved = settings::Settings{};
+                profiles.warnings.clear();
+                store.set_last_profile(config::kDefaultProfile);
+            }
+            report(status, std::format("Profile \"{}\" deleted", request.name));
+            break;
+        }
+        case ProfileOp::reset:
+            state_.settings = settings::Settings{};
+            settings_replaced();
+            report(settings::ProfileStatus::success(), "Settings reset to the defaults (not saved)");
+            break;
+        }
+        refresh_profile_list();
     }
 
     // An "on / off" action: each press flips the feature's Enabled switch (two quick presses in one frame: back
@@ -525,6 +736,7 @@ private:
     }
 
     const Context& ctx_;
+    std::optional<settings::ProfileStore> profile_store_; // profiles next to the exe (load_startup_profile)
     ui::OverlayWindow overlay_;
     ui::ImGuiLayer imgui_;
     AppState state_;

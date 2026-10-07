@@ -80,7 +80,7 @@ inline constexpr float kWatermarkMargin = 10.0f;   // from the top-left corner o
 inline constexpr float kFrameOutlineThickness = 2.0f;
 
 // --- Setting ranges ------------------------------------------------------------------------------------------------
-// Each numeric setting's range, defined once: the menu's sliders use it, and Phase 8 clamps loaded profiles to it.
+// Each numeric setting's range, defined once: the menu's sliders use it, and loading a profile clamps to it.
 template <class T>
 struct Range
 {
@@ -103,6 +103,17 @@ inline constexpr Range<float> kRadarRange{10.0f, 150.0f};    // metres from the 
 inline constexpr Range<float> kRadarDotSize{2.0f, 8.0f};     // pixels (radius)
 inline constexpr Range<float> kBombTimerTop{0.0f, 1000.0f};  // pixels from the top of the game window
 inline constexpr Range<float> kSpectatorTop{0.0f, 1000.0f};  // pixels from the top of the game window
+
+// --- Profiles (Phase 8) --------------------------------------------------------------------------------------------
+// <folder of cs2_external.exe>\profiles\<name>.json, plus .last_profile (the profile to load on the next start).
+// Bump kProfileSchemaVersion (and add a migration in settings/profile_json.cpp) when a change would load wrongly from
+// an older profile: a field renamed, moved or re-meant. A new field with a sensible default needs nothing.
+inline constexpr int kProfileSchemaVersion = 1;
+inline constexpr std::size_t kProfileNameMaxLength = 40;
+inline constexpr char kDefaultProfile[] = "default"; // built in (the code defaults), read-only
+inline constexpr char kProfilesFolder[] = "profiles";
+inline constexpr char kProfileExtension[] = ".json";
+inline constexpr char kLastProfileFile[] = ".last_profile";
 
 // --- Aimbot and triggerbot (Phase 5) -------------------------------------------------------------------------------
 // Smoothing is defined per 60 Hz frame (1 / smoothing of the remaining angle each 1/60 s), then scaled to the real

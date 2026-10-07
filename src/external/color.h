@@ -1,6 +1,6 @@
 #pragma once
 
-// An RGBA colour as floats in 0..1, the way the settings store colours (Phase 8 saves them as "#RRGGBBAA").
+// An RGBA colour as floats in 0..1, the way the settings store colours (profiles save them as "#RRGGBBAA").
 //
 // PURE: no <Windows.h>, no ImGui.
 
@@ -19,6 +19,21 @@ struct Color
     {
         return Color{static_cast<float>((hex >> 16) & 0xFF) / 255.0f, static_cast<float>((hex >> 8) & 0xFF) / 255.0f,
                      static_cast<float>(hex & 0xFF) / 255.0f, alpha};
+    }
+
+    // 0xRRGGBBAA. Profiles store colours this way, so a default meant to survive a save and load unchanged uses it
+    // (a byte-exact alpha) instead of rgb(hex, 0.35f).
+    [[nodiscard]] static constexpr Color rgba(std::uint32_t hex) noexcept
+    {
+        return Color{static_cast<float>((hex >> 24) & 0xFF) / 255.0f, static_cast<float>((hex >> 16) & 0xFF) / 255.0f,
+                     static_cast<float>((hex >> 8) & 0xFF) / 255.0f, static_cast<float>(hex & 0xFF) / 255.0f};
+    }
+
+    // Back to 0xRRGGBBAA: each channel clamped to 0..1 and rounded to the nearest byte.
+    [[nodiscard]] constexpr std::uint32_t to_rgba() const noexcept
+    {
+        const auto byte = [](float v) { return static_cast<std::uint32_t>(std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f); };
+        return (byte(r) << 24) | (byte(g) << 16) | (byte(b) << 8) | byte(a);
     }
 
     // The same colour with its alpha multiplied by `factor` (fading a colour out).

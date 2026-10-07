@@ -41,8 +41,8 @@
 
   <PropertyGroup>
     <TargetName>tests</TargetName>
-    <!-- doctest is third-party: on the external include path, so its warnings are off. -->
-    <ExternalIncludePath>$(RepoRoot)external\doctest;$(ExternalIncludePath)</ExternalIncludePath>
+    <!-- doctest and nlohmann/json are third-party: on the external include path, so their warnings are off. -->
+    <ExternalIncludePath>$(RepoRoot)external\doctest;$(RepoRoot)external\nlohmann;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
 
   <ItemDefinitionGroup>
@@ -97,6 +97,9 @@
     <ClCompile Include="maths\test_projection.cpp" />
     <ClCompile Include="maths\test_skeleton.cpp" />
     <ClCompile Include="settings\test_settings.cpp" />
+    <ClCompile Include="settings\test_profile_json.cpp" />
+    <ClCompile Include="settings\test_profile_store.cpp" />
+    <ClCompile Include="settings\test_presets.cpp" />
     <ClCompile Include="input\test_keys.cpp" />
     <ClCompile Include="input\test_keybinds.cpp" />
     <ClCompile Include="input\test_bind_capture.cpp" />
@@ -139,6 +142,9 @@
     <ClCompile Include="..\src\external\input\keybinds.cpp" />
     <ClCompile Include="..\src\external\input\bind_capture.cpp" />
     <ClCompile Include="..\src\external\input\key_tracker.cpp" />
+    <ClCompile Include="..\src\external\settings\presets.cpp" />
+    <ClCompile Include="..\src\external\settings\profile_json.cpp" />
+    <ClCompile Include="..\src\external\settings\profile_store.cpp" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

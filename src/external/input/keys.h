@@ -2,8 +2,8 @@
 
 // Virtual-key codes <-> readable names: every keyboard key and mouse button a bind can use.
 //
-// Binds are virtual-key codes in memory; Phase 8's JSON profiles store the names ("INSERT", "Mouse 4", "F5"), so
-// profiles stay readable.
+// Binds are virtual-key codes in memory; profiles (settings/profile_json) store the names ("INSERT", "Mouse 4", "F5"),
+// so profiles stay readable.
 // - The scroll wheel can't be polled with GetAsyncKeyState, so it isn't bindable.
 // - Generic Shift/Ctrl/Alt (0x10-0x12) are left out on purpose: they report "down" together with the left/right
 //   variants, so a capture would pick the wrong one. Use LSHIFT/RSHIFT etc.

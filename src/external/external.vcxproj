@@ -43,6 +43,8 @@
 
   <PropertyGroup>
     <TargetName>cs2_external</TargetName>
+    <!-- nlohmann/json is third-party: on the external include path, so its warnings are off. -->
+    <ExternalIncludePath>$(RepoRoot)external\nlohmann;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
 
   <ItemDefinitionGroup>
@@ -95,6 +97,9 @@
     <ClCompile Include="maths\projection.cpp" />
     <ClCompile Include="maths\skeleton.cpp" />
     <ClCompile Include="render\painter.cpp" />
+    <ClCompile Include="settings\presets.cpp" />
+    <ClCompile Include="settings\profile_json.cpp" />
+    <ClCompile Include="settings\profile_store.cpp" />
     <ClCompile Include="ui\hud.cpp" />
     <ClCompile Include="ui\imgui_layer.cpp" />
     <ClCompile Include="ui\keybind_widgets.cpp" />

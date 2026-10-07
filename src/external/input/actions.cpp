@@ -33,6 +33,10 @@ constexpr std::array<ActionDef, kActionCount> kActions = {{
     press(ActionId::radar_enable, "radar_enable_toggle", "Radar on / off", Category::misc),
     press(ActionId::bomb_timer_enable, "bomb_timer_enable_toggle", "Bomb timer on / off", Category::misc),
     press(ActionId::spectators_enable, "spectators_enable_toggle", "Spectator list on / off", Category::misc),
+    press(ActionId::preset_off, "preset_off", "Preset: Off", Category::presets),
+    press(ActionId::preset_chill, "preset_chill", "Preset: Chill", Category::presets),
+    press(ActionId::preset_medium, "preset_medium", "Preset: Medium", Category::presets),
+    press(ActionId::preset_rage, "preset_rage", "Preset: Rage", Category::presets),
 }};
 
 constexpr bool in_id_order()
@@ -58,6 +62,7 @@ std::string_view category_name(Category category) noexcept
     case Category::triggerbot: return "Triggerbot";
     case Category::esp: return "ESP";
     case Category::misc: return "Misc";
+    case Category::presets: return "Presets";
     }
     return "";
 }

@@ -51,6 +51,11 @@ enum class ActionId : std::size_t
     radar_enable,
     bomb_timer_enable,
     spectators_enable,
+    // Presets (settings/presets)
+    preset_off,
+    preset_chill,
+    preset_medium,
+    preset_rage,
 
     count,
 };
@@ -68,15 +73,16 @@ enum class Category : std::uint8_t
     triggerbot,
     esp,
     misc,
+    presets,
 };
 inline constexpr std::array kCategories{Category::general, Category::aimbot, Category::triggerbot, Category::esp,
-                                        Category::misc};
+                                        Category::misc, Category::presets};
 [[nodiscard]] std::string_view category_name(Category category) noexcept;
 
 struct ActionDef
 {
     ActionId id;
-    std::string_view key;   // stable id for profiles (Phase 8), e.g. "menu_toggle"
+    std::string_view key;   // stable id in profiles (settings/profile_json), e.g. "menu_toggle": never rename one
     std::string_view label; // shown on the Keybinds page, e.g. "Show / hide the menu"
     Category category;
     bool hold_or_toggle; // true: HOLD or TOGGLE; false: PRESS only

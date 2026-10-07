@@ -63,7 +63,7 @@ bool ImGuiLayer::init(HWND window, ID3D11Device* device, ID3D11DeviceContext* co
     ImGui::CreateContext();
 
     ImGuiIO& io = ImGui::GetIO();
-    io.IniFilename = nullptr; // no imgui.ini next to the exe (profiles come in Phase 8)
+    io.IniFilename = nullptr; // no imgui.ini next to the exe (our settings live in profiles)
     io.LogFilename = nullptr;
     io.ConfigFlags |= kMenuClosedFlags; // the menu starts closed
 

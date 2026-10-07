@@ -88,6 +88,15 @@ void draw_status(PageContext& ctx)
     const std::string active = features::feature_summary(app.active);
     widgets::info_row("Active", active.empty() ? "no features on" : active.c_str(),
                       active.empty() ? theme::kTextDim : theme::kAccent);
+    if (app.unsaved_changes())
+    {
+        widgets::info_row("Profile", std::format("{}  (unsaved changes)", app.profiles.current).c_str(),
+                          theme::kWarn);
+    }
+    else
+    {
+        widgets::info_row("Profile", app.profiles.current.c_str());
+    }
     widgets::info_row("Overlay",
                       std::format("{} x {}  at {:.0f} FPS", app.overlay_width, app.overlay_height, app.fps).c_str());
     widgets::card_end();

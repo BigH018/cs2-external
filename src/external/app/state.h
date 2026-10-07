@@ -4,12 +4,17 @@
 // Plain data: the menu edits `settings`; app/frame fills in the rest.
 
 #include <cstdint>
+#include <optional>
+#include <string>
+#include <vector>
 
+#include "config.h"
 #include "core/process.h"
 #include "features/feature_summary.h"
 #include "features/triggerbot.h"
 #include "game/snapshot.h"
 #include "input/bind_capture.h"
+#include "settings/presets.h"
 #include "settings/settings.h"
 
 namespace app
@@ -33,11 +38,51 @@ struct OffsetReport
     [[nodiscard]] bool ok() const noexcept { return ran && failures == 0; }
 };
 
+// A profile operation the Settings page asks for; app/frame does it at the start of the next frame.
+enum class ProfileOp : std::uint8_t
+{
+    load,    // name = the profile to load
+    save,    // the current settings over the current profile
+    save_as, // name = the new profile (becomes the current one)
+    rename,  // the current profile -> name
+    remove,  // name = the profile to delete
+    reset,   // the current settings back to the code defaults (not saved)
+};
+
+struct ProfileRequest
+{
+    ProfileOp op = ProfileOp::load;
+    std::string name;
+};
+
+// Which profile is loaded and what it looked like when it was last loaded or saved (for the unsaved-changes marker).
+struct ProfileState
+{
+    std::string current = config::kDefaultProfile;
+    settings::Settings saved;          // the current profile as on disk
+    std::vector<std::string> names;    // "default" first, then the saved profiles
+    std::vector<std::string> warnings; // problems found in the last loaded profile (also in the console)
+    std::string folder;                // where the files are (UTF-8, shown on the Settings page)
+    std::string message;               // the last operation's result ("Profile \"rage\" saved")
+    bool message_failed = false;
+};
+
+// What the menu asks app/frame to do on the next frame (the menu never acts itself).
+struct Requests
+{
+    std::optional<ProfileRequest> profile;
+    std::optional<settings::Preset> preset;
+};
+
 struct AppState
 {
     GameInfo game;
     OffsetReport offsets;
     settings::Settings settings; // edited by the menu, applied live by app/frame
+    ProfileState profiles;       // Phase 8: the profile `settings` came from
+    Requests requests;
+
+    [[nodiscard]] bool unsaved_changes() const { return settings != profiles.saved; }
 
     // Which features are on, for the watermark. Filled from the settings by app/frame every frame.
     features::ActiveFeatures active;

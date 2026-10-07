@@ -3,8 +3,10 @@
 // The orchestrator (same role as in the AC project): the only place that wires the overlay window, ImGui, game reads
 // and the menu together, one frame at a time. Main thread only.
 //
+// Before the first frame: the last used profile (settings/profile_store) becomes the settings.
 // One frame: pump messages (raw input counts key presses) -> follow the game window and focus -> menu key (the
-// overlay's hotkey) -> keybinds (poll, bind capture, engine, actions: panic, exit, on / off keys) -> game snapshot
+// overlay's hotkey) -> keybinds (poll, bind capture, engine, actions: panic, exit, on / off keys, presets) -> the
+// menu's requests from the last frame (profile operations, presets) -> game snapshot
 // (every frame while a feature is on, ~4 Hz otherwise) -> aimbot (view angle write) -> triggerbot (attack button
 // write) -> ESP, radar, panels -> HUD + menu -> present.
 
