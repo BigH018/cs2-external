@@ -30,7 +30,9 @@ TEST_CASE("skeleton links: 17 lines, all within the bones that are read")
         CHECK(link.to < maths::kBoneCount);
         CHECK(link.from != link.to);
     }
-    CHECK(maths::bone::kHead == 6); // proven live in build 14189
+    CHECK(maths::bone::kHead == 6);       // proven live in build 14189
+    CHECK(maths::bone::kHeadCentre == 7); // proven live 2026-10-07 (screenshot)
+    CHECK(maths::bone::kHeadCentre < maths::kBoneCount);
 }
 
 TEST_CASE("project_skeleton: every link in front of the camera, none behind it")

@@ -18,11 +18,25 @@ struct OverlaySettings
     bool frame_outline = false; // a thin outline along the overlay's edges, to check that it covers the game exactly
 };
 
-// Who counts as an enemy. Deathmatch is free-for-all in CS2 (everyone is an enemy whatever their team).
+// Who counts as an enemy, for every feature. Deathmatch is free-for-all in CS2 (everyone is an enemy whatever their
+// team).
 enum class TeamMode : std::uint8_t
 {
     teams,        // enemies = the other team
     free_for_all, // enemies = everyone else
+};
+
+struct GeneralSettings
+{
+    TeamMode team_mode = TeamMode::teams;
+};
+
+// How a key switches a feature on. Phase 7's keybind engine adds PRESS and key capture; until then a key is chosen
+// from input::kBindableKeys.
+enum class BindMode : std::uint8_t
+{
+    hold,   // on while the key is held
+    toggle, // each press switches it on or off
 };
 
 enum class BoxStyle : std::uint8_t
@@ -53,9 +67,8 @@ struct EspColours
 struct EspSettings
 {
     bool enabled = false;
-    TeamMode team_mode = TeamMode::teams;
     bool show_teammates = false; // teams mode only: draw your own team too (in the team colours)
-    float max_distance = 0.0f;   // metres; 0 = no limit (config::kEspMaxDistance)
+    float max_distance = 0.0f;   // metres; 0 = no limit (config::kMaxDistance)
 
     bool box = true;
     BoxStyle box_style = BoxStyle::full;
@@ -78,9 +91,89 @@ struct EspSettings
     EspColours colours;
 };
 
+// Which point of a target the aimbot aims at.
+enum class AimTarget : std::uint8_t
+{
+    head,    // the head bone (the eyes without bones)
+    body,    // the chest
+    nearest, // whichever of head, neck, chest, stomach and pelvis is closest to the crosshair
+};
+
+// Which target the aimbot picks when several are inside the FOV.
+enum class AimPriority : std::uint8_t
+{
+    crosshair,     // the smallest angle from where you're looking
+    distance,      // the closest
+    lowest_health, // the weakest
+};
+
+struct AimbotSettings
+{
+    bool enabled = false;
+    std::uint32_t key = 0x01; // virtual-key code (input::kBindableKeys): Mouse 1, so it aims while you shoot
+    BindMode mode = BindMode::hold;
+    AimTarget target = AimTarget::head;
+    AimPriority priority = AimPriority::crosshair;
+    float fov = 5.0f;          // degrees from the crosshair (config::kAimFov)
+    bool draw_fov = true;      // the FOV as a circle around the crosshair
+    Color fov_colour = Color::rgb(0xEDEBF7, 0.35f);
+    float smoothing = 5.0f;    // 1 = snap; higher = slower, framerate-independent (config::kAimSmoothing)
+    bool team_check = true;    // only enemies (who is an enemy: GeneralSettings::team_mode)
+    float max_distance = 0.0f; // metres; 0 = no limit (config::kMaxDistance)
+    bool visible_only = false; // only targets the spotted-by heuristic says you can see
+};
+
+// When the triggerbot is allowed to fire.
+enum class TriggerActivation : std::uint8_t
+{
+    always,
+    hold,   // while the key is held
+    toggle, // each press switches it on or off
+};
+
+enum class FireMode : std::uint8_t
+{
+    single, // one shot per volley
+    burst,  // N shots per volley, "delay between shots" apart
+    hold,   // attack held down while a target stays under the crosshair
+};
+
+// Which weapon classes the triggerbot fires with (game::WeaponClass).
+struct WeaponFilter
+{
+    bool pistol = true;
+    bool smg = true;
+    bool rifle = true;
+    bool sniper = true;
+    bool shotgun = true;
+    bool heavy = true;
+};
+
+struct TriggerbotSettings
+{
+    bool enabled = false;
+    TriggerActivation activation = TriggerActivation::hold;
+    std::uint32_t key = 0x05;  // virtual-key code (input::kBindableKeys): Mouse 4
+    int reaction_ms = 40;      // from the target appearing to the first shot (config::kTriggerReaction)
+    FireMode fire_mode = FireMode::single;
+    int burst_shots = 3;       // burst mode (config::kTriggerBurst)
+    int shot_delay_ms = 150;   // between shots, and after a volley (config::kTriggerShotDelay)
+    bool team_check = true;    // only enemies (GeneralSettings::team_mode)
+    bool visible_only = false; // only targets the spotted-by heuristic says you can see
+    float max_distance = 0.0f; // metres; 0 = no limit (config::kMaxDistance)
+    WeaponFilter weapons;
+    bool snipers_scoped_only = true; // with a sniper rifle, only while zoomed in
+    bool not_flashed = true;         // not while you're flashed
+    bool not_in_air = true;          // not while you're jumping or falling
+    bool head_only = false;          // only when the crosshair is on the head
+};
+
 struct Settings
 {
     OverlaySettings overlay;
+    GeneralSettings general;
     EspSettings esp;
+    AimbotSettings aimbot;
+    TriggerbotSettings triggerbot;
 };
 } // namespace settings

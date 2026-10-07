@@ -241,5 +241,18 @@ inline constexpr std::size_t kGlobalsReadSize = 0x190;         // one read cover
 // positions in each bot's own frame, on CT and T models alike.
 inline constexpr std::uintptr_t kModelStateBones = 0x80;
 inline constexpr std::size_t kBoneStride = 0x20;
+
+// --- Button state values (written as uint32 at client.dll + buttons::*) ---
+// Proven 2026-10-06 (build 14189) with live writes in an offline bot match: 65537 on `jump` made the local player
+// jump (vertical velocity 286, +52 units), 256 released it; one 30 ms press of `attack` fired one round (clip 30 ->
+// 29), three taps fired three, even a 10 ms press fired. At rest the four bytes read 00 01 00 01; after our release
+// they read 00 01 00 00, which the game accepts (the next press works the same).
+inline constexpr std::uint32_t kButtonPressed = 65537;
+inline constexpr std::uint32_t kButtonReleased = 256;
+
+// --- View angles (client.dll + dwViewAngles: float pitch, yaw, roll) ---
+// Proven 2026-10-06 with live writes: yaw + 10 and pitch - 5 written there showed up in the local pawn's
+// m_angEyeAngles within 200 ms; writing the old values back restored the view. Only pitch and yaw are written.
+inline constexpr std::size_t kViewAnglesWriteSize = 2 * sizeof(float);
 } // namespace layout
 } // namespace game::offsets

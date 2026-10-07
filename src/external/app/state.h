@@ -7,6 +7,7 @@
 
 #include "core/process.h"
 #include "features/feature_summary.h"
+#include "features/triggerbot.h"
 #include "game/snapshot.h"
 #include "settings/settings.h"
 
@@ -39,6 +40,18 @@ struct AppState
 
     // Which features are on, for the watermark. Filled from the settings by app/frame every frame.
     features::ActiveFeatures active;
+
+    // What the aimbot and triggerbot are doing this frame, for their pages.
+    struct AimStatus
+    {
+        bool active = false;     // enabled, key held / toggled on, menu closed, game focused
+        bool has_target = false; // a target inside the FOV this frame
+    } aim_status;
+    struct TriggerStatus
+    {
+        bool active = false; // enabled, activation allows it, menu closed, game focused
+        features::TriggerBlock block = features::TriggerBlock::not_in_match;
+    } trigger_status;
 
     bool menu_open = false;
     bool focus_warning = false; // the menu opened but couldn't take focus from the game

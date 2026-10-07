@@ -38,10 +38,6 @@ struct ScreenBox
 // Green at full health, yellow at half, red near zero.
 [[nodiscard]] Color health_colour(int health) noexcept;
 
-// True if `player` counts as an enemy of `local` under `mode`.
-[[nodiscard]] bool is_enemy(const game::PlayerSnapshot& player, const game::PlayerSnapshot& local,
-                            settings::TeamMode mode) noexcept;
-
 // The name as drawn: cut to config::kEspMaxNameLength characters with "...", "?" if empty.
 [[nodiscard]] std::string display_name(std::string_view name);
 
@@ -49,8 +45,9 @@ struct ScreenBox
 [[nodiscard]] std::string distance_text(float metres);
 
 // Everything the ESP draws this frame. Nothing outside a match, without a sane view matrix, or with the ESP off.
-// `line_height` is the label font's height in pixels (labels are stacked by it).
+// `team_mode` decides who is an enemy; `line_height` is the label font's height in pixels (labels are stacked by it).
 [[nodiscard]] std::vector<render::Primitive> build_esp(const game::GameSnapshot& game,
-                                                       const settings::EspSettings& settings, maths::Vec2 screen,
+                                                       const settings::EspSettings& settings,
+                                                       settings::TeamMode team_mode, maths::Vec2 screen,
                                                        float line_height);
 } // namespace features

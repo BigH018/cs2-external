@@ -10,6 +10,7 @@
 #include "game/view.h"
 #include "game/visibility.h"
 #include "game/weapon.h"
+#include "game/writes.h"
 
 namespace game
 {
@@ -92,6 +93,7 @@ std::optional<PlayerSnapshot> read_player(const core::Memory& memory, std::uintp
     if (const std::uintptr_t pawn = resolve_handle(memory, entity_system, *pawn_handle); pawn != 0)
     {
         read_pawn(memory, entity_system, pawn, controller_alive, player);
+        player.pawn_index = player.pawn != 0 ? handle_index(*pawn_handle) : 0;
     }
     return player;
 }
@@ -126,6 +128,17 @@ GameSnapshot read_game(const core::Memory& memory, std::uintptr_t client_base)
             snapshot.players.push_back(std::move(*player));
         }
     }
+    if (const PlayerSnapshot* local = snapshot.local(); local != nullptr && local->pawn != 0)
+    {
+        LocalState& state = snapshot.local_state;
+        state.crosshair_entity =
+            memory.read<std::int32_t>(local->pawn + schema::C_CSPlayerPawn::m_iIDEntIndex).value_or(-1);
+        state.flash_alpha =
+            memory.read<float>(local->pawn + schema::C_CSPlayerPawnBase::m_flFlashOverlayAlpha).value_or(0.0f);
+        state.flash_max_alpha =
+            memory.read<float>(local->pawn + schema::C_CSPlayerPawnBase::m_flFlashMaxAlpha).value_or(0.0f);
+    }
+    snapshot.local_state.view_angles = read_view_angles(memory, client_base);
     return snapshot;
 }
 } // namespace game

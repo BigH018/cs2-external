@@ -28,7 +28,11 @@ inline constexpr std::uint8_t kSpine1 = 2;
 inline constexpr std::uint8_t kSpine2 = 3;
 inline constexpr std::uint8_t kSpine3 = 4;
 inline constexpr std::uint8_t kNeck = 5;
-inline constexpr std::uint8_t kHead = 6;
+inline constexpr std::uint8_t kHead = 6; // the head joint: the base of the skull, level with the jaw
+// The middle of the head: eye height, ~4.6 units forward of the head joint's line. Proven 2026-10-07 (build 14189) by
+// projecting bones 6 and 7 onto a screenshot of a bot in plain view: 6 lands on the jaw/neck, 7 inside the head. The
+// head circle, head aim and the triggerbot's head check use this one; the skeleton keeps the joint.
+inline constexpr std::uint8_t kHeadCentre = 7;
 inline constexpr std::uint8_t kLeftShoulder = 9;
 inline constexpr std::uint8_t kLeftElbow = 10;
 inline constexpr std::uint8_t kLeftHand = 11;

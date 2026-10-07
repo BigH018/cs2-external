@@ -67,7 +67,7 @@ Mode parse_mode(int argc, char* argv[])
 
 int run(Mode mode)
 {
-    logger::info("CS2 External - Phase 4 (offline only: -insecure, bots, never a VAC server)");
+    logger::info("CS2 External - Phase 5 (offline only: -insecure, bots, never a VAC server)");
 
     const auto pid = core::find_process(config::kGameExe);
     if (!pid)
@@ -77,7 +77,9 @@ int run(Mode mode)
     }
     logger::info("cs2.exe      PID {}", *pid);
 
-    const core::OpenResult opened = core::open_handle(*pid, core::kReadOnlyAccess);
+    // Only the overlay writes (aimbot, triggerbot); --diag and --live keep a read-only handle.
+    const DWORD access = mode == Mode::overlay ? core::kReadWriteAccess : core::kReadOnlyAccess;
+    const core::OpenResult opened = core::open_handle(*pid, access);
     if (!opened.handle)
     {
         if (opened.error == ERROR_ACCESS_DENIED)
@@ -90,7 +92,7 @@ int run(Mode mode)
         }
         return 1;
     }
-    const core::ProcessMemory memory(opened.handle.get());
+    core::ProcessMemory memory(opened.handle.get());
 
     const auto client = core::module_base(*pid, config::kClientModule);
     const auto engine = core::module_base(*pid, config::kEngineModule);

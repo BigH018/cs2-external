@@ -1,6 +1,8 @@
 #include "app/frame.h"
 
+#include <chrono>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include <imgui.h>
@@ -9,8 +11,13 @@
 #include "config.h"
 #include "core/log.h"
 #include "core/runtime.h"
+#include "features/activation.h"
+#include "features/aimbot.h"
 #include "features/esp.h"
+#include "features/triggerbot.h"
+#include "game/offsets.h"
 #include "game/player.h"
+#include "game/writes.h"
 #include "maths/vec.h"
 #include "render/painter.h"
 #include "render/primitives.h"
@@ -34,6 +41,12 @@ bool client_area(HWND window, RECT& area) noexcept
     }
     area = RECT{top_left.x, top_left.y, top_left.x + client.right, top_left.y + client.bottom};
     return client.right > 0 && client.bottom > 0;
+}
+
+// Phase 5 polls the few keys it needs; Phase 7's keybind engine (input/key_poll) replaces this.
+bool key_down(std::uint32_t vk) noexcept
+{
+    return (GetAsyncKeyState(static_cast<int>(vk)) & 0x8000) != 0;
 }
 
 class Runner
@@ -77,6 +90,7 @@ public:
             }
         }
 
+        stop_features(); // let go of attack if the triggerbot holds it
         if (state_.menu_open)
         {
             close_menu(true);
@@ -124,12 +138,21 @@ private:
             return true;
         }
         follow(area);
-        state_.active.esp = state_.settings.esp.enabled;
+        const settings::Settings& settings = state_.settings;
+        state_.active.esp = settings.esp.enabled;
+        state_.active.aimbot = settings.aimbot.enabled;
+        state_.active.triggerbot = settings.triggerbot.enabled;
         read_game();
+
+        // Aiming and firing only while you're playing: the game in front, the menu closed.
+        const bool playing = game_focused && !state_.menu_open;
+        const float frame_seconds = frame_time();
+        run_aimbot(playing, frame_seconds);
+        run_triggerbot(playing);
 
         imgui_.begin_frame();
         state_.fps = imgui_.framerate();
-        draw_esp();
+        draw_world();
         ui::draw_hud(imgui_.fonts(), imgui_.logo(), state_);
         if (state_.menu_open)
         {
@@ -172,6 +195,7 @@ private:
     // The game lost focus or is minimised: nothing on screen, and nothing to do but wait.
     void hide()
     {
+        stop_features();
         if (state_.menu_open)
         {
             close_menu(false);
@@ -199,7 +223,7 @@ private:
     void read_game()
     {
         const std::uint64_t now = GetTickCount64();
-        const bool every_frame = state_.active.esp;
+        const bool every_frame = state_.active.esp || state_.active.aimbot || state_.active.triggerbot;
         if (!every_frame && now < next_status_ms_)
         {
             return;
@@ -223,13 +247,120 @@ private:
         }
     }
 
-    // Under the watermark and the menu, on ImGui's background draw list.
-    void draw_esp()
+    // Seconds since the previous frame (0 on the first), for the aimbot's frame-rate-independent smoothing.
+    float frame_time()
+    {
+        const auto now = std::chrono::steady_clock::now();
+        const float seconds = last_frame_ ? std::chrono::duration<float>(now - *last_frame_).count() : 0.0f;
+        last_frame_ = now;
+        return seconds;
+    }
+
+    // One smoothing step towards the target, written to the game's view angles.
+    void run_aimbot(bool playing, float frame_seconds)
+    {
+        const settings::AimbotSettings& aim = state_.settings.aimbot;
+        if (!aim.enabled)
+        {
+            aim_key_.reset();
+            state_.aim_status = {};
+            return;
+        }
+        const bool active = aim_key_.update(playing && key_down(aim.key), aim.mode) && playing;
+        state_.aim_status = {active, false};
+        if (!active)
+        {
+            return;
+        }
+        const auto angles =
+            features::compute_aim(state_.snapshot, aim, state_.settings.general.team_mode, frame_seconds);
+        state_.aim_status.has_target = angles.has_value();
+        if (angles && !game::write_view_angles(ctx_.memory, ctx_.client.base, *angles))
+        {
+            warn_write_failed("view angles");
+        }
+    }
+
+    void run_triggerbot(bool playing)
+    {
+        const settings::TriggerbotSettings& trigger = state_.settings.triggerbot;
+        if (!trigger.enabled)
+        {
+            trigger_key_.reset();
+            triggerbot_.reset();
+            state_.trigger_status = {};
+            set_attack(false);
+            return;
+        }
+        bool allowed = true;
+        if (trigger.activation != settings::TriggerActivation::always)
+        {
+            const settings::BindMode mode = trigger.activation == settings::TriggerActivation::hold
+                                                ? settings::BindMode::hold
+                                                : settings::BindMode::toggle;
+            allowed = trigger_key_.update(playing && key_down(trigger.key), mode);
+        }
+        const bool active = allowed && playing;
+        const features::TriggerBlock block =
+            features::trigger_block(state_.snapshot, trigger, state_.settings.general.team_mode);
+        state_.trigger_status = {active, block};
+        set_attack(triggerbot_.update(GetTickCount64(), active, block == features::TriggerBlock::none, trigger));
+    }
+
+    // Presses or releases the game's attack button, only on a change. A release is skipped while you hold the
+    // attack key yourself, so the triggerbot never cancels your own shooting.
+    void set_attack(bool down)
+    {
+        if (down == attack_down_)
+        {
+            return;
+        }
+        attack_down_ = down;
+        if (!down && key_down(VK_LBUTTON))
+        {
+            return;
+        }
+        if (!game::set_button(ctx_.memory, ctx_.client.base, game::offsets::buttons::attack, down))
+        {
+            warn_write_failed("attack button");
+        }
+    }
+
+    // The game lost focus, the overlay hides or the tool exits: nothing may stay pressed.
+    void stop_features()
+    {
+        triggerbot_.reset();
+        set_attack(false);
+        aim_key_.reset();
+        trigger_key_.reset();
+        last_frame_.reset();
+    }
+
+    void warn_write_failed(const char* what)
+    {
+        if (!write_warned_)
+        {
+            logger::warn("Writing the {} failed (is the handle missing write access?). Further failures aren't logged.",
+                         what);
+            write_warned_ = true;
+        }
+    }
+
+    // Under the watermark and the menu, on ImGui's background draw list: the ESP and the aimbot's FOV circle.
+    void draw_world()
     {
         const maths::Vec2 screen{static_cast<float>(state_.overlay_width), static_cast<float>(state_.overlay_height)};
         const float font_size = ui::scaled(config::kEspFontSize);
-        const std::vector<render::Primitive> primitives =
-            features::build_esp(state_.snapshot, state_.settings.esp, screen, font_size);
+        std::vector<render::Primitive> primitives = features::build_esp(
+            state_.snapshot, state_.settings.esp, state_.settings.general.team_mode, screen, font_size);
+        const settings::AimbotSettings& aim = state_.settings.aimbot;
+        if (aim.enabled && aim.draw_fov)
+        {
+            if (const auto circle = features::fov_circle(state_.snapshot, aim, screen))
+            {
+                primitives.push_back(*circle);
+            }
+        }
         render::paint(*ImGui::GetBackgroundDrawList(), primitives, imgui_.fonts().regular, font_size);
     }
 
@@ -269,6 +400,12 @@ private:
     bool overlay_had_focus_ = false;
     RECT last_area_{};
     std::uint64_t next_status_ms_ = 0;
+    features::KeyActivation aim_key_;
+    features::KeyActivation trigger_key_;
+    features::Triggerbot triggerbot_;
+    bool attack_down_ = false; // what we last wrote to the attack button
+    bool write_warned_ = false;
+    std::optional<std::chrono::steady_clock::time_point> last_frame_;
 };
 } // namespace
 

@@ -10,9 +10,10 @@
 
 namespace core
 {
-// Phase 0 only reads. Write access (PROCESS_VM_WRITE | PROCESS_VM_OPERATION) is added only when a write feature
-// needs it.
+// --diag and --live only read. The overlay adds write access (Phase 5) for its only game writes: the view angles
+// (aimbot) and the attack button (triggerbot), each a single field (game/writes).
 inline constexpr DWORD kReadOnlyAccess = PROCESS_VM_READ | PROCESS_QUERY_LIMITED_INFORMATION;
+inline constexpr DWORD kReadWriteAccess = kReadOnlyAccess | PROCESS_VM_WRITE | PROCESS_VM_OPERATION;
 
 // RAII owner of a kernel HANDLE closed with CloseHandle. Holds nullptr when empty (INVALID_HANDLE_VALUE is normalised
 // to nullptr on construction).

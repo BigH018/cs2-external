@@ -83,8 +83,12 @@
     <ClCompile Include="maths\test_vec.cpp" />
     <ClCompile Include="features\test_esp.cpp" />
     <ClCompile Include="features\test_feature_summary.cpp" />
+    <ClCompile Include="features\test_aimbot.cpp" />
+    <ClCompile Include="features\test_triggerbot.cpp" />
     <ClCompile Include="game\test_bones.cpp" />
     <ClCompile Include="game\test_visibility.cpp" />
+    <ClCompile Include="game\test_writes.cpp" />
+    <ClCompile Include="maths\test_angles.cpp" />
     <ClCompile Include="maths\test_projection.cpp" />
     <ClCompile Include="maths\test_skeleton.cpp" />
     <ClCompile Include="settings\test_settings.cpp" />
@@ -110,6 +114,11 @@
     <ClCompile Include="..\src\external\game\visibility.cpp" />
     <ClCompile Include="..\src\external\maths\projection.cpp" />
     <ClCompile Include="..\src\external\maths\skeleton.cpp" />
+    <ClCompile Include="..\src\external\features\aimbot.cpp" />
+    <ClCompile Include="..\src\external\features\targeting.cpp" />
+    <ClCompile Include="..\src\external\features\triggerbot.cpp" />
+    <ClCompile Include="..\src\external\game\writes.cpp" />
+    <ClCompile Include="..\src\external\maths\angles.cpp" />
   </ItemGroup>
 
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

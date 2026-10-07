@@ -92,14 +92,31 @@ struct Range
     [[nodiscard]] constexpr T clamp(T value) const noexcept { return std::clamp(value, min, max); }
 };
 
+inline constexpr Range<float> kMaxDistance{0.0f, 300.0f};    // metres, every feature's max distance; 0 = no limit
 inline constexpr Range<float> kEspThickness{1.0f, 4.0f};     // pixels
-inline constexpr Range<float> kEspMaxDistance{0.0f, 300.0f}; // metres; 0 = no limit
+inline constexpr Range<float> kAimFov{0.5f, 30.0f};          // degrees from the crosshair
+inline constexpr Range<float> kAimSmoothing{1.0f, 30.0f};    // 1 = snap
+inline constexpr Range<int> kTriggerReaction{0, 500};        // ms
+inline constexpr Range<int> kTriggerShotDelay{20, 1000};     // ms
+inline constexpr Range<int> kTriggerBurst{2, 10};            // shots
+
+// --- Aimbot and triggerbot (Phase 5) -------------------------------------------------------------------------------
+// Smoothing is defined per 60 Hz frame (1 / smoothing of the remaining angle each 1/60 s), then scaled to the real
+// frame time, so it feels the same at any overlay frame rate. Frame times above this are clamped (a stall).
+inline constexpr float kSmoothingReferenceHz = 60.0f;
+inline constexpr float kMaxFrameSeconds = 0.1f;
+// How long the triggerbot holds attack for one shot. Proven 2026-10-06: a 10 ms press already fires one round.
+inline constexpr std::uint32_t kTriggerTapMs = 30;
+// Flashed = the flash overlay is more than this fraction of its maximum (m_flFlashOverlayAlpha / m_flFlashMaxAlpha).
+inline constexpr float kFlashedFraction = 0.5f;
+// Head only: the crosshair ray must pass within this many world units of the head bone.
+inline constexpr float kTriggerHeadRadius = 5.0f;
 
 // --- ESP drawing (Phase 4) -----------------------------------------------------------------------------------------
 inline constexpr float kEspFontSize = 15.0f;         // labels over the bots, in pixels
 inline constexpr float kEspBoxAspect = 0.5f;         // box width = height * this
 inline constexpr float kEspBoxTopAboveEye = 8.0f;    // world units from the eyes to the top of the box
-inline constexpr float kEspHeadRadius = 5.0f;        // world units, for the head circle
+inline constexpr float kEspHeadRadius = 6.5f;        // world units around bone::kHeadCentre: crown to chin
 inline constexpr float kEspLabelGap = 2.0f;          // pixels between the box and a label
 inline constexpr float kEspHealthBarWidth = 3.0f;    // pixels
 inline constexpr float kEspHealthBarGap = 3.0f;      // pixels between the box and the health bar

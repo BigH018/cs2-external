@@ -12,6 +12,7 @@
 
 #include "game/globals.h"
 #include "game/visibility.h"
+#include "maths/angles.h"
 #include "maths/projection.h"
 #include "maths/skeleton.h"
 #include "maths/vec.h"
@@ -34,6 +35,7 @@ struct PlayerSnapshot
     std::uint32_t index = 0;       // controller entity index; player slot = index - 1
     std::uintptr_t controller = 0;
     std::uintptr_t pawn = 0;       // 0 if the controller has no pawn right now
+    std::uint32_t pawn_index = 0;  // the pawn's entity index (what m_iIDEntIndex names), 0 without a pawn
     bool is_local = false;
 
     std::string name;
@@ -53,19 +55,35 @@ struct PlayerSnapshot
     std::optional<maths::Bones> bones;  // world positions (maths/skeleton.h), if the bone array read sanely
 
     [[nodiscard]] maths::Vec3 eye_position() const noexcept { return origin + view_offset; }
-    // The head: its bone if the bones were read, otherwise the eye position.
+    // The middle of the head: bone::kHeadCentre if the bones were read, otherwise the eye position.
     [[nodiscard]] maths::Vec3 head_position() const noexcept
     {
-        return bones ? (*bones)[maths::bone::kHead] : eye_position();
+        return bones ? (*bones)[maths::bone::kHeadCentre] : eye_position();
     }
     [[nodiscard]] std::uint32_t slot() const noexcept { return player_slot(index); }
     [[nodiscard]] bool on_ground() const noexcept { return (flags & kFlagOnGround) != 0; }
+};
+
+// What only the local player has: the entity under the crosshair, the flash, where the camera looks.
+struct LocalState
+{
+    std::int32_t crosshair_entity = -1; // m_iIDEntIndex: entity index under the crosshair, -1 = none
+    float flash_alpha = 0.0f;           // m_flFlashOverlayAlpha: the white overlay right now
+    float flash_max_alpha = 0.0f;       // m_flFlashMaxAlpha: its peak for the current flash
+    std::optional<maths::Angles> view_angles; // dwViewAngles
+
+    // More than config::kFlashedFraction of the flash's peak is still on screen.
+    [[nodiscard]] bool flashed(float fraction) const noexcept
+    {
+        return flash_max_alpha > 0.0f && flash_alpha > flash_max_alpha * fraction;
+    }
 };
 
 // Everything one read of the game produced.
 struct GameSnapshot
 {
     bool in_match = false;              // the local player's controller exists
+    LocalState local_state;             // only meaningful in a match
     GlobalVars globals;
     std::optional<maths::ViewMatrix> view; // only when is_sane()
     std::vector<PlayerSnapshot> players; // every controller, the local player included, in index order

@@ -62,8 +62,11 @@
     <ClCompile Include="core\pe.cpp" />
     <ClCompile Include="core\process.cpp" />
     <ClCompile Include="core\process_memory.cpp" />
+    <ClCompile Include="features\aimbot.cpp" />
     <ClCompile Include="features\esp.cpp" />
     <ClCompile Include="features\feature_summary.cpp" />
+    <ClCompile Include="features\targeting.cpp" />
+    <ClCompile Include="features\triggerbot.cpp" />
     <ClCompile Include="game\bones.cpp" />
     <ClCompile Include="game\entities.cpp" />
     <ClCompile Include="game\globals.cpp" />
@@ -75,6 +78,8 @@
     <ClCompile Include="game\view.cpp" />
     <ClCompile Include="game\visibility.cpp" />
     <ClCompile Include="game\weapon.cpp" />
+    <ClCompile Include="game\writes.cpp" />
+    <ClCompile Include="maths\angles.cpp" />
     <ClCompile Include="maths\projection.cpp" />
     <ClCompile Include="maths\skeleton.cpp" />
     <ClCompile Include="render\painter.cpp" />
@@ -85,6 +90,7 @@
     <ClCompile Include="ui\theme.cpp" />
     <ClCompile Include="ui\widgets.cpp" />
     <ClCompile Include="ui\pages\aimbot_page.cpp" />
+    <ClCompile Include="ui\pages\controls.cpp" />
     <ClCompile Include="ui\pages\esp_page.cpp" />
     <ClCompile Include="ui\pages\home_page.cpp" />
     <ClCompile Include="ui\pages\misc_page.cpp" />
@@ -105,8 +111,12 @@
     <ClInclude Include="core\process.h" />
     <ClInclude Include="core\process_memory.h" />
     <ClInclude Include="core\runtime.h" />
+    <ClInclude Include="features\activation.h" />
+    <ClInclude Include="features\aimbot.h" />
     <ClInclude Include="features\esp.h" />
     <ClInclude Include="features\feature_summary.h" />
+    <ClInclude Include="features\targeting.h" />
+    <ClInclude Include="features\triggerbot.h" />
     <ClInclude Include="game\bones.h" />
     <ClInclude Include="game\entities.h" />
     <ClInclude Include="game\globals.h" />
@@ -121,6 +131,9 @@
     <ClInclude Include="game\view.h" />
     <ClInclude Include="game\visibility.h" />
     <ClInclude Include="game\weapon.h" />
+    <ClInclude Include="game\writes.h" />
+    <ClInclude Include="input\keys.h" />
+    <ClInclude Include="maths\angles.h" />
     <ClInclude Include="maths\projection.h" />
     <ClInclude Include="maths\skeleton.h" />
     <ClInclude Include="maths\vec.h" />
@@ -134,6 +147,7 @@
     <ClInclude Include="ui\overlay_window.h" />
     <ClInclude Include="ui\theme.h" />
     <ClInclude Include="ui\widgets.h" />
+    <ClInclude Include="ui\pages\controls.h" />
     <ClInclude Include="ui\pages\pages.h" />
   </ItemGroup>
   <ItemGroup>

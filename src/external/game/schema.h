@@ -65,7 +65,9 @@ inline constexpr std::uintptr_t m_hActiveWeapon = 0x60; // 96, CHandle<C_BasePla
 
 namespace C_CSPlayerPawnBase
 {
-inline constexpr std::uintptr_t m_flFlashDuration = 0x1510; // 5392, float
+inline constexpr std::uintptr_t m_flFlashOverlayAlpha = 0x1504; // 5380, float (the white overlay right now)
+inline constexpr std::uintptr_t m_flFlashMaxAlpha     = 0x150C; // 5388, float (its peak for this flash)
+inline constexpr std::uintptr_t m_flFlashDuration     = 0x1510; // 5392, float
 } // namespace C_CSPlayerPawnBase
 
 namespace C_CSPlayerPawn
@@ -138,6 +140,8 @@ inline constexpr std::array kFields{
     Field{"C_BasePlayerPawn", "m_pWeaponServices", C_BasePlayerPawn::m_pWeaponServices},
     Field{"C_BasePlayerPawn", "m_hController", C_BasePlayerPawn::m_hController},
     Field{"CPlayer_WeaponServices", "m_hActiveWeapon", CPlayer_WeaponServices::m_hActiveWeapon},
+    Field{"C_CSPlayerPawnBase", "m_flFlashOverlayAlpha", C_CSPlayerPawnBase::m_flFlashOverlayAlpha},
+    Field{"C_CSPlayerPawnBase", "m_flFlashMaxAlpha", C_CSPlayerPawnBase::m_flFlashMaxAlpha},
     Field{"C_CSPlayerPawnBase", "m_flFlashDuration", C_CSPlayerPawnBase::m_flFlashDuration},
     Field{"C_CSPlayerPawn", "m_entitySpottedState", C_CSPlayerPawn::m_entitySpottedState},
     Field{"C_CSPlayerPawn", "m_bIsScoped", C_CSPlayerPawn::m_bIsScoped},

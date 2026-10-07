@@ -7,6 +7,7 @@
 #include <doctest.h>
 
 #include "features/esp.h"
+#include "features/targeting.h"
 #include "game/snapshot.h"
 #include "settings/settings.h"
 
@@ -16,6 +17,7 @@ using render::Primitive;
 
 constexpr maths::Vec2 kScreen{1920.0f, 1080.0f};
 constexpr float kLineHeight = 15.0f;
+constexpr settings::TeamMode kTeams = settings::TeamMode::teams;
 
 // A camera at the world origin looking along +x: clip.x = -y, clip.y = z, w = x.
 constexpr maths::ViewMatrix kCamera{{0.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f,
@@ -139,24 +141,25 @@ TEST_CASE("display_name and distance_text")
 TEST_CASE("build_esp draws nothing when off, outside a match, or without a view matrix")
 {
     game::GameSnapshot game = make_game();
-    CHECK(features::build_esp(game, settings::EspSettings{}, kScreen, kLineHeight).empty());
+    CHECK(features::build_esp(game, settings::EspSettings{}, kTeams, kScreen, kLineHeight).empty());
 
     game.view.reset();
-    CHECK(features::build_esp(game, enabled(), kScreen, kLineHeight).empty());
+    CHECK(features::build_esp(game, enabled(), kTeams, kScreen, kLineHeight).empty());
 
     game = make_game();
     game.in_match = false;
-    CHECK(features::build_esp(game, enabled(), kScreen, kLineHeight).empty());
+    CHECK(features::build_esp(game, enabled(), kTeams, kScreen, kLineHeight).empty());
 }
 
 TEST_CASE("build_esp: enemies only by default; teammates with the option; everyone in free for all")
 {
     const game::GameSnapshot game = make_game();
     settings::EspSettings esp = enabled();
+    settings::TeamMode team_mode = kTeams;
     esp.visibility_colours = false; // everyone in the "visible" colours
     const settings::EspColours& c = esp.colours;
 
-    auto out = features::build_esp(game, esp, kScreen, kLineHeight);
+    auto out = features::build_esp(game, esp, team_mode, kScreen, kLineHeight);
     CHECK(boxes_in(out, c.enemy_visible) == 1);
     CHECK(boxes_in(out, c.team_visible) == 0);
     CHECK(has_text(out, "Bot2"));
@@ -164,20 +167,21 @@ TEST_CASE("build_esp: enemies only by default; teammates with the option; everyo
     CHECK_FALSE(has_text(out, "Bot1")); // never yourself
 
     esp.show_teammates = true;
-    out = features::build_esp(game, esp, kScreen, kLineHeight);
+    out = features::build_esp(game, esp, team_mode, kScreen, kLineHeight);
     CHECK(boxes_in(out, c.enemy_visible) == 1);
     CHECK(boxes_in(out, c.team_visible) == 1);
 
     esp.show_teammates = false;
-    esp.team_mode = settings::TeamMode::free_for_all;
-    out = features::build_esp(game, esp, kScreen, kLineHeight);
+    team_mode = settings::TeamMode::free_for_all;
+    out = features::build_esp(game, esp, team_mode, kScreen, kLineHeight);
     CHECK(boxes_in(out, c.enemy_visible) == 2);
 }
 
 TEST_CASE("build_esp skips the dead, the dormant, pawnless, far and behind-the-camera players")
 {
     settings::EspSettings esp = enabled();
-    esp.team_mode = settings::TeamMode::free_for_all;
+    settings::TeamMode team_mode = kTeams;
+    team_mode = settings::TeamMode::free_for_all;
     esp.visibility_colours = false;
     const Color colour = esp.colours.enemy_visible;
 
@@ -185,32 +189,32 @@ TEST_CASE("build_esp skips the dead, the dormant, pawnless, far and behind-the-c
     {
         game::GameSnapshot game = make_game();
         game.players[1].alive = false;
-        CHECK(boxes_in(features::build_esp(game, esp, kScreen, kLineHeight), colour) == 1);
+        CHECK(boxes_in(features::build_esp(game, esp, team_mode, kScreen, kLineHeight), colour) == 1);
     }
     SUBCASE("dormant")
     {
         game::GameSnapshot game = make_game();
         game.players[1].dormant = true;
-        CHECK(boxes_in(features::build_esp(game, esp, kScreen, kLineHeight), colour) == 1);
+        CHECK(boxes_in(features::build_esp(game, esp, team_mode, kScreen, kLineHeight), colour) == 1);
     }
     SUBCASE("no pawn")
     {
         game::GameSnapshot game = make_game();
         game.players[1].pawn = 0;
-        CHECK(boxes_in(features::build_esp(game, esp, kScreen, kLineHeight), colour) == 1);
+        CHECK(boxes_in(features::build_esp(game, esp, team_mode, kScreen, kLineHeight), colour) == 1);
     }
     SUBCASE("behind the camera")
     {
         game::GameSnapshot game = make_game();
         game.players[1].origin.x = -500.0f;
-        CHECK(boxes_in(features::build_esp(game, esp, kScreen, kLineHeight), colour) == 1);
+        CHECK(boxes_in(features::build_esp(game, esp, team_mode, kScreen, kLineHeight), colour) == 1);
     }
     SUBCASE("beyond the max distance")
     {
         game::GameSnapshot game = make_game();
         game.players[2].origin.x = 5000.0f; // ~127 m; Bot2 is ~12.7 m away
         esp.max_distance = 50.0f;
-        const auto out = features::build_esp(game, esp, kScreen, kLineHeight);
+        const auto out = features::build_esp(game, esp, team_mode, kScreen, kLineHeight);
         CHECK(boxes_in(out, colour) == 1);
         CHECK(has_text(out, "Bot2"));
     }
@@ -220,15 +224,16 @@ TEST_CASE("build_esp: visible / hidden colours follow the spotted-by bit of your
 {
     game::GameSnapshot game = make_game();
     settings::EspSettings esp = enabled();
+    settings::TeamMode team_mode = kTeams;
     const settings::EspColours& c = esp.colours;
 
-    CHECK(boxes_in(features::build_esp(game, esp, kScreen, kLineHeight), c.enemy_hidden) == 1);
+    CHECK(boxes_in(features::build_esp(game, esp, team_mode, kScreen, kLineHeight), c.enemy_hidden) == 1);
 
     game.players[1].spotted_by_mask = std::uint64_t{1} << 0; // slot 0 = you (controller index 1)
-    CHECK(boxes_in(features::build_esp(game, esp, kScreen, kLineHeight), c.enemy_visible) == 1);
+    CHECK(boxes_in(features::build_esp(game, esp, team_mode, kScreen, kLineHeight), c.enemy_visible) == 1);
 
     game.players[1].spotted_by_mask = std::uint64_t{1} << 4; // someone else spotted it
-    CHECK(boxes_in(features::build_esp(game, esp, kScreen, kLineHeight), c.enemy_hidden) == 1);
+    CHECK(boxes_in(features::build_esp(game, esp, team_mode, kScreen, kLineHeight), c.enemy_hidden) == 1);
 }
 
 TEST_CASE("build_esp: labels")
@@ -237,9 +242,10 @@ TEST_CASE("build_esp: labels")
     game.players[1].health = 57;
     game.players[1].scoped = true;
     settings::EspSettings esp = enabled();
+    settings::TeamMode team_mode = kTeams;
     esp.health_number = true;
 
-    auto out = features::build_esp(game, esp, kScreen, kLineHeight);
+    auto out = features::build_esp(game, esp, team_mode, kScreen, kLineHeight);
     CHECK(has_text(out, "Bot2"));
     CHECK(has_text(out, "AK-47"));
     CHECK(has_text(out, "13 m")); // 500 units = 12.7 m
@@ -248,7 +254,7 @@ TEST_CASE("build_esp: labels")
     CHECK(all_of_type<render::FilledRect>(out).size() == 2); // health bar back + fill
 
     esp.name = esp.weapon = esp.distance = esp.scoped_indicator = esp.health_bar = esp.health_number = false;
-    out = features::build_esp(game, esp, kScreen, kLineHeight);
+    out = features::build_esp(game, esp, team_mode, kScreen, kLineHeight);
     CHECK(all_of_type<render::Text>(out).empty());
     CHECK(all_of_type<render::FilledRect>(out).empty());
 }
@@ -257,56 +263,73 @@ TEST_CASE("build_esp: box styles, outline, head circle, skeleton, snaplines")
 {
     game::GameSnapshot game = make_game();
     settings::EspSettings esp = enabled();
+    settings::TeamMode team_mode = kTeams;
     esp.name = esp.weapon = esp.distance = esp.health_bar = false;
 
     SUBCASE("full box with outline: shadow rect + rect")
     {
-        const auto out = features::build_esp(game, esp, kScreen, kLineHeight);
+        const auto out = features::build_esp(game, esp, team_mode, kScreen, kLineHeight);
         CHECK(all_of_type<render::Rect>(out).size() == 2);
         esp.outline = false;
-        CHECK(all_of_type<render::Rect>(features::build_esp(game, esp, kScreen, kLineHeight)).size() == 1);
+        CHECK(all_of_type<render::Rect>(features::build_esp(game, esp, team_mode, kScreen, kLineHeight)).size() == 1);
     }
     SUBCASE("corners: 8 lines, 16 with the outline")
     {
         esp.box_style = settings::BoxStyle::corners;
-        auto out = features::build_esp(game, esp, kScreen, kLineHeight);
+        auto out = features::build_esp(game, esp, team_mode, kScreen, kLineHeight);
         CHECK(all_of_type<render::Rect>(out).empty());
         CHECK(all_of_type<render::Line>(out).size() == 16);
         esp.outline = false;
-        out = features::build_esp(game, esp, kScreen, kLineHeight);
+        out = features::build_esp(game, esp, team_mode, kScreen, kLineHeight);
         CHECK(all_of_type<render::Line>(out).size() == 8);
     }
     SUBCASE("head circle around the eyes (no bones)")
     {
         esp.head_circle = true;
-        const auto circles = all_of_type<render::Circle>(features::build_esp(game, esp, kScreen, kLineHeight));
+        const auto circles =
+            all_of_type<render::Circle>(features::build_esp(game, esp, team_mode, kScreen, kLineHeight));
         REQUIRE(circles.size() == 1);
         CHECK(circles[0].centre.x == doctest::Approx(960.0f));
         CHECK(circles[0].radius >= 2.0f);
+    }
+    SUBCASE("head circle on the middle of the head (bone 7), not the head joint (bone 6, the jaw)")
+    {
+        esp.head_circle = true;
+        maths::Bones bones{};
+        bones.fill(game.players[1].origin);
+        bones[maths::bone::kHead] = {500.0f, 0.0f, 20.0f};
+        bones[maths::bone::kHeadCentre] = {500.0f, 0.0f, 30.0f};
+        game.players[1].bones = bones;
+        const auto circles =
+            all_of_type<render::Circle>(features::build_esp(game, esp, team_mode, kScreen, kLineHeight));
+        REQUIRE(circles.size() == 1);
+        CHECK(circles[0].centre.y == doctest::Approx(540.0f - 540.0f * 30.0f / 500.0f));
+        // 6.5 units at 500 units away: 540 * 6.5 / 500 pixels.
+        CHECK(circles[0].radius == doctest::Approx(540.0f * 6.5f / 500.0f).epsilon(0.01));
     }
     SUBCASE("skeleton only with bones")
     {
         esp.box = false;
         esp.skeleton = true;
-        CHECK(all_of_type<render::Line>(features::build_esp(game, esp, kScreen, kLineHeight)).empty());
+        CHECK(all_of_type<render::Line>(features::build_esp(game, esp, team_mode, kScreen, kLineHeight)).empty());
         maths::Bones bones{};
         for (std::size_t i = 0; i < bones.size(); ++i)
         {
             bones[i] = game.players[1].origin + maths::Vec3{0.0f, 0.0f, static_cast<float>(i) * 3.0f};
         }
         game.players[1].bones = bones;
-        CHECK(all_of_type<render::Line>(features::build_esp(game, esp, kScreen, kLineHeight)).size() ==
+        CHECK(all_of_type<render::Line>(features::build_esp(game, esp, team_mode, kScreen, kLineHeight)).size() ==
               maths::kSkeletonLinks.size());
     }
     SUBCASE("snaplines from the chosen origin")
     {
         esp.box = false;
         esp.snaplines = true;
-        auto lines = all_of_type<render::Line>(features::build_esp(game, esp, kScreen, kLineHeight));
+        auto lines = all_of_type<render::Line>(features::build_esp(game, esp, team_mode, kScreen, kLineHeight));
         REQUIRE(lines.size() == 1);
         CHECK(lines[0].from == maths::Vec2{960.0f, 1080.0f});
         esp.snapline_origin = settings::SnaplineOrigin::top;
-        lines = all_of_type<render::Line>(features::build_esp(game, esp, kScreen, kLineHeight));
+        lines = all_of_type<render::Line>(features::build_esp(game, esp, team_mode, kScreen, kLineHeight));
         REQUIRE(lines.size() == 1);
         CHECK(lines[0].from == maths::Vec2{960.0f, 0.0f});
     }

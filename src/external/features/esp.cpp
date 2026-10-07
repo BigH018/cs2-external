@@ -5,7 +5,7 @@
 #include <format>
 
 #include "config.h"
-#include "game/visibility.h"
+#include "features/targeting.h"
 #include "game/weapon.h"
 #include "maths/skeleton.h"
 
@@ -202,15 +202,6 @@ Color health_colour(int health) noexcept
                             : kHealthEmpty.lerp(kHealthHalf, fraction * 2.0f);
 }
 
-bool is_enemy(const game::PlayerSnapshot& player, const game::PlayerSnapshot& local, settings::TeamMode mode) noexcept
-{
-    if (player.controller == local.controller)
-    {
-        return false;
-    }
-    return mode == settings::TeamMode::free_for_all || player.team != local.team;
-}
-
 std::string display_name(std::string_view name)
 {
     if (name.empty())
@@ -230,7 +221,7 @@ std::string distance_text(float metres)
 }
 
 std::vector<render::Primitive> build_esp(const game::GameSnapshot& game, const settings::EspSettings& settings,
-                                         maths::Vec2 screen, float line_height)
+                                         settings::TeamMode team_mode, maths::Vec2 screen, float line_height)
 {
     std::vector<render::Primitive> out;
     const game::PlayerSnapshot* local = game.local();
@@ -242,17 +233,17 @@ std::vector<render::Primitive> build_esp(const game::GameSnapshot& game, const s
     PlayerPainter painter(settings, out, line_height);
     for (const game::PlayerSnapshot& player : game.players)
     {
-        if (player.is_local || !player.alive || player.dormant || player.pawn == 0)
+        if (!is_live_target(player))
         {
             continue;
         }
-        const bool enemy = is_enemy(player, *local, settings.team_mode);
-        if (!enemy && (settings.team_mode == settings::TeamMode::free_for_all || !settings.show_teammates))
+        const bool enemy = is_enemy(player, *local, team_mode);
+        if (!enemy && (team_mode == settings::TeamMode::free_for_all || !settings.show_teammates))
         {
             continue;
         }
-        const float metres = maths::units_to_metres(local->origin.distance_to(player.origin));
-        if (settings.max_distance > 0.0f && metres > settings.max_distance)
+        const float metres = distance_metres(*local, player);
+        if (!within_distance(metres, settings.max_distance))
         {
             continue;
         }
@@ -262,8 +253,7 @@ std::vector<render::Primitive> build_esp(const game::GameSnapshot& game, const s
             continue;
         }
 
-        const bool visible =
-            !settings.visibility_colours || game::is_spotted_by(player.spotted_by_mask, local->slot());
+        const bool visible = !settings.visibility_colours || is_visible_to(player, *local);
         const settings::EspColours& colours = settings.colours;
         const Color colour = enemy ? (visible ? colours.enemy_visible : colours.enemy_hidden)
                                    : (visible ? colours.team_visible : colours.team_hidden);
