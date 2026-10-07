@@ -84,6 +84,8 @@
     <ClCompile Include="features\test_esp.cpp" />
     <ClCompile Include="features\test_feature_summary.cpp" />
     <ClCompile Include="features\test_radar.cpp" />
+    <ClCompile Include="features\test_bomb_timer.cpp" />
+    <ClCompile Include="game\test_bomb.cpp" />
     <ClCompile Include="features\test_aimbot.cpp" />
     <ClCompile Include="features\test_triggerbot.cpp" />
     <ClCompile Include="game\test_bones.cpp" />
@@ -112,6 +114,8 @@
     <ClCompile Include="..\src\external\features\esp.cpp" />
     <ClCompile Include="..\src\external\features\feature_summary.cpp" />
     <ClCompile Include="..\src\external\features\radar.cpp" />
+    <ClCompile Include="..\src\external\features\bomb_timer.cpp" />
+    <ClCompile Include="..\src\external\game\bomb.cpp" />
     <ClCompile Include="..\src\external\game\bones.cpp" />
     <ClCompile Include="..\src\external\game\visibility.cpp" />
     <ClCompile Include="..\src\external\maths\projection.cpp" />

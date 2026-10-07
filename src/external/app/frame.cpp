@@ -13,9 +13,12 @@
 #include "core/runtime.h"
 #include "features/activation.h"
 #include "features/aimbot.h"
+#include "features/bomb_timer.h"
 #include "features/esp.h"
 #include "features/radar.h"
 #include "features/triggerbot.h"
+#include "game/bomb.h"
+#include "game/handle.h"
 #include "game/offsets.h"
 #include "game/player.h"
 #include "game/writes.h"
@@ -144,6 +147,7 @@ private:
         state_.active.aimbot = settings.aimbot.enabled;
         state_.active.triggerbot = settings.triggerbot.enabled;
         state_.active.radar = settings.radar.enabled;
+        state_.active.bomb_timer = settings.bomb_timer.enabled;
         read_game();
 
         // Aiming and firing only while you're playing: the game in front, the menu closed.
@@ -225,8 +229,8 @@ private:
     void read_game()
     {
         const std::uint64_t now = GetTickCount64();
-        const bool every_frame =
-            state_.active.esp || state_.active.aimbot || state_.active.triggerbot || state_.active.radar;
+        const bool every_frame = state_.active.esp || state_.active.aimbot || state_.active.triggerbot ||
+                                 state_.active.radar || state_.active.bomb_timer;
         if (!every_frame && now < next_status_ms_)
         {
             return;
@@ -237,6 +241,13 @@ private:
         state_.pawn_read_ok = pawn.has_value();
         state_.local_pawn = pawn.value_or(0);
         state_.snapshot = game::read_game(ctx_.memory, ctx_.client.base);
+        if (state_.active.bomb_timer)
+        {
+            if (const auto entity_system = game::read_entity_system(ctx_.memory, ctx_.client.base))
+            {
+                state_.snapshot.bomb = game::read_bomb(ctx_.memory, ctx_.client.base, *entity_system);
+            }
+        }
         if (state_.in_match() != was_in_match)
         {
             if (state_.in_match())
@@ -349,8 +360,8 @@ private:
         }
     }
 
-    // Under the watermark and the menu, on ImGui's background draw list: the ESP, the aimbot's FOV circle and the
-    // radar.
+    // Under the watermark and the menu, on ImGui's background draw list: the ESP, the aimbot's FOV circle, the radar
+    // and the bomb timer.
     void draw_world()
     {
         const maths::Vec2 screen{static_cast<float>(state_.overlay_width), static_cast<float>(state_.overlay_height)};
@@ -368,6 +379,9 @@ private:
         const std::vector<render::Primitive> radar =
             features::build_radar(state_.snapshot, state_.settings.radar, state_.settings.general.team_mode, screen);
         primitives.insert(primitives.end(), radar.begin(), radar.end());
+        const std::vector<render::Primitive> bomb =
+            features::build_bomb_timer(state_.snapshot, state_.settings.bomb_timer, screen, font_size);
+        primitives.insert(primitives.end(), bomb.begin(), bomb.end());
         render::paint(*ImGui::GetBackgroundDrawList(), primitives, imgui_.fonts().regular, font_size);
     }
 

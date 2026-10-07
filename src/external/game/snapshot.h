@@ -80,6 +80,23 @@ struct LocalState
     }
 };
 
+// The planted bomb (game/bomb). Times are game times, like GlobalVars::curtime.
+struct PlantedBomb
+{
+    std::uintptr_t entity = 0;
+    std::int32_t site = -1;          // m_nBombSite: 0 = A, 1 = B
+    maths::Vec3 position;
+    bool ticking = false;
+    bool exploded = false;
+    bool defused = false;
+    bool being_defused = false;
+    float blow_time = 0.0f;          // m_flC4Blow: when it explodes
+    float timer_length = 0.0f;       // m_flTimerLength: the whole fuse (40 s by default)
+    float defuse_end = 0.0f;         // m_flDefuseCountDown: when the defuse in progress completes
+    float defuse_length = 0.0f;      // m_flDefuseLength: 10 s, 5 s with a kit
+    std::uintptr_t defuser_pawn = 0; // the pawn defusing it, 0 = nobody
+};
+
 // Everything one read of the game produced.
 struct GameSnapshot
 {
@@ -88,6 +105,7 @@ struct GameSnapshot
     GlobalVars globals;
     std::optional<maths::ViewMatrix> view; // only when is_sane()
     std::vector<PlayerSnapshot> players; // every controller, the local player included, in index order
+    std::optional<PlantedBomb> bomb;     // a bomb is planted; only read while the bomb timer is on (game/bomb)
 
     // The local player, or nullptr if they aren't in the list.
     [[nodiscard]] const PlayerSnapshot* local() const noexcept

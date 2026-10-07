@@ -58,6 +58,15 @@ TEST_CASE("Settings defaults: radar off, every number inside its range")
     CHECK(radar.colours.background.a < 1.0f); // see-through
 }
 
+TEST_CASE("Settings defaults: bomb timer off, inside its range")
+{
+    const settings::BombTimerSettings timer = settings::Settings{}.bomb_timer;
+    CHECK_FALSE(timer.enabled);
+    CHECK(config::kBombTimerTop.contains(timer.top));
+    CHECK(timer.defuse_hint);
+    CHECK(timer.distance);
+}
+
 TEST_CASE("input::kBindableKeys: names and indices")
 {
     CHECK(input::key_name(0x01) == "Mouse 1");

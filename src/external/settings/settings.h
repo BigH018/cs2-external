@@ -203,6 +203,15 @@ struct RadarSettings
     RadarColours colours;
 };
 
+// A countdown panel at the top-centre of the game window while a bomb is planted.
+struct BombTimerSettings
+{
+    bool enabled = false;
+    float top = 120.0f;       // pixels from the top of the game window, under its round timer (config::kBombTimerTop)
+    bool defuse_hint = true;  // whether a defuse started now would make it (no kit / kit / too late)
+    bool distance = true;     // how far you are from the bomb
+};
+
 struct Settings
 {
     OverlaySettings overlay;
@@ -211,5 +220,6 @@ struct Settings
     AimbotSettings aimbot;
     TriggerbotSettings triggerbot;
     RadarSettings radar;
+    BombTimerSettings bomb_timer;
 };
 } // namespace settings

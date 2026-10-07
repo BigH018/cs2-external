@@ -23,6 +23,16 @@
 
 namespace game::schema
 {
+// Every entity starts with CEntityInstance: m_pEntity points to its identity in the entity list (handle, designer
+// name). Phase 6: the bomb timer's stale-pointer check. NOT in kFields: its class info isn't one of client.dll's own
+// (another library registers it in the client scope), so the live schema index can't see it. Proven instead by the
+// bomb's handle round-trip (2026-10-07: identity = entity-list slot 232, which holds the same bomb), which `--diag`'s
+// "Bomb (dwPlantedC4)" check repeats whenever a bomb is planted.
+namespace CEntityInstance
+{
+inline constexpr std::uintptr_t m_pEntity = 0x10; // 16, CEntityIdentity*
+} // namespace CEntityInstance
+
 namespace C_BaseEntity
 {
 inline constexpr std::uintptr_t m_pGameSceneNode = 0x330; // 816, CGameSceneNode*
@@ -116,6 +126,29 @@ namespace C_EconItemView
 inline constexpr std::uintptr_t m_iItemDefinitionIndex = 0x1BA; // 442, uint16
 } // namespace C_EconItemView
 
+// The game rules object (client.dll + dwGameRules -> C_CSGameRules*). Phase 6: is a bomb planted (the diagnostic's
+// cross-check of dwPlantedC4).
+namespace C_CSGameRules
+{
+inline constexpr std::uintptr_t m_bBombPlanted = 0x8C7; // 2247, bool
+} // namespace C_CSGameRules
+
+// The planted bomb (client.dll + dwPlantedC4 -> C_PlantedC4*). Times are game times, like CGlobalVars::curtime.
+// Phase 6: the bomb timer.
+namespace C_PlantedC4
+{
+inline constexpr std::uintptr_t m_bBombTicking      = 0x1288; // 4744, bool
+inline constexpr std::uintptr_t m_nBombSite         = 0x128C; // 4748, int32 (0 = A, 1 = B)
+inline constexpr std::uintptr_t m_flC4Blow          = 0x12B8; // 4792, GameTime_t (when it explodes)
+inline constexpr std::uintptr_t m_bHasExploded      = 0x12BD; // 4797, bool
+inline constexpr std::uintptr_t m_flTimerLength     = 0x12C0; // 4800, float (seconds, 40 by default)
+inline constexpr std::uintptr_t m_bBeingDefused     = 0x12C4; // 4804, bool
+inline constexpr std::uintptr_t m_flDefuseLength    = 0x12D4; // 4820, float (10 s, 5 s with a kit)
+inline constexpr std::uintptr_t m_flDefuseCountDown = 0x12D8; // 4824, GameTime_t (when the defuse completes)
+inline constexpr std::uintptr_t m_bBombDefused      = 0x12DC; // 4828, bool
+inline constexpr std::uintptr_t m_hBombDefuser      = 0x12E0; // 4832, CHandle<C_CSPlayerPawn>
+} // namespace C_PlantedC4
+
 // Every field above, for the startup diagnostic that compares them with the live schema system.
 // Add a line here whenever you add a field above.
 struct Field
@@ -158,5 +191,16 @@ inline constexpr std::array kFields{
     Field{"C_EconEntity", "m_AttributeManager", C_EconEntity::m_AttributeManager},
     Field{"C_AttributeContainer", "m_Item", C_AttributeContainer::m_Item},
     Field{"C_EconItemView", "m_iItemDefinitionIndex", C_EconItemView::m_iItemDefinitionIndex},
+    Field{"C_CSGameRules", "m_bBombPlanted", C_CSGameRules::m_bBombPlanted},
+    Field{"C_PlantedC4", "m_bBombTicking", C_PlantedC4::m_bBombTicking},
+    Field{"C_PlantedC4", "m_nBombSite", C_PlantedC4::m_nBombSite},
+    Field{"C_PlantedC4", "m_flC4Blow", C_PlantedC4::m_flC4Blow},
+    Field{"C_PlantedC4", "m_bHasExploded", C_PlantedC4::m_bHasExploded},
+    Field{"C_PlantedC4", "m_flTimerLength", C_PlantedC4::m_flTimerLength},
+    Field{"C_PlantedC4", "m_bBeingDefused", C_PlantedC4::m_bBeingDefused},
+    Field{"C_PlantedC4", "m_flDefuseLength", C_PlantedC4::m_flDefuseLength},
+    Field{"C_PlantedC4", "m_flDefuseCountDown", C_PlantedC4::m_flDefuseCountDown},
+    Field{"C_PlantedC4", "m_bBombDefused", C_PlantedC4::m_bBombDefused},
+    Field{"C_PlantedC4", "m_hBombDefuser", C_PlantedC4::m_hBombDefuser},
 };
 } // namespace game::schema

@@ -68,6 +68,22 @@ void draw_radar_colours(PageContext& ctx, settings::RadarSettings& radar)
     }
     widgets::card_end();
 }
+
+void draw_bomb_timer(PageContext& ctx, settings::BombTimerSettings& timer)
+{
+    widgets::card_begin(ctx.fonts, "Bomb timer");
+    check("Enabled", &timer.enabled,
+          "While a bomb is planted: a countdown at the top of the screen with the site, a bar, and who is defusing. "
+          "Only in modes with a bomb (Casual, Competitive), not Deathmatch.");
+    ImGui::SetNextItemWidth(scaled(240.0f));
+    ImGui::SliderFloat("Height", &timer.top, config::kBombTimerTop.min, config::kBombTimerTop.max,
+                       "%.0f px from the top", ImGuiSliderFlags_AlwaysClamp);
+    check("Defuse hint", &timer.defuse_hint,
+          "Whether a defuse started now would make it: green = even without a kit (over 10 s left), yellow = only "
+          "with a kit (over 5 s), red = too late. While someone defuses: whether their defuse finishes in time.");
+    check("Distance", &timer.distance, "How far you are from the bomb.");
+    widgets::card_end();
+}
 } // namespace
 
 void draw_misc(PageContext& ctx)
@@ -76,7 +92,8 @@ void draw_misc(PageContext& ctx)
     settings::RadarSettings& radar = ctx.app.settings.radar;
     draw_radar(ctx, radar);
     draw_radar_colours(ctx, radar);
+    draw_bomb_timer(ctx, ctx.app.settings.bomb_timer);
     widgets::planned_card(ctx.fonts, "Coming next (Phase 6)",
-                          {"Bomb timer", "Spectator list", "Hitsound (played by the overlay, not the game)"});
+                          {"Spectator list", "Hitsound (played by the overlay, not the game)"});
 }
 } // namespace ui::pages

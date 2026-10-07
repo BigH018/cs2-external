@@ -15,6 +15,8 @@
 #include "core/log.h"
 #include "core/pattern.h"
 #include "core/pe.h"
+#include "game/bomb.h"
+#include "game/handle.h"
 #include "game/interfaces.h"
 #include "game/offsets.h"
 #include "game/player.h"
@@ -270,8 +272,38 @@ void show_globals(const core::Memory& memory, const core::ModuleInfo& client)
                      : std::format("row 0 = {:.3f} {:.3f} {:.3f} {:.3f}", matrix[0], matrix[1], matrix[2], matrix[3]));
 }
 
+// The game rules (always) and the planted bomb (only when one is down: it needs a defuse-mode match).
+void check_bomb(Tally& tally, const core::Memory& memory, const core::ModuleInfo& client,
+                const game::GlobalVars& globals)
+{
+    const auto planted = game::read_bomb_planted(memory, client.base);
+    tally.check(planted.has_value(), std::format("{:<26} bomb planted: {}", "Game rules (dwGameRules)",
+                                                 planted ? (*planted ? "yes" : "no") : "unreadable"));
+    if (!planted || !*planted)
+    {
+        logger::info("       {:<26} none planted (plant one in a Casual / Competitive bot match to check it)",
+                     "Bomb (dwPlantedC4)");
+        return;
+    }
+    // The same read the bomb timer does: dwPlantedC4 -> C_PlantedC4, its handle leading back to it, sane fields.
+    const auto entity_system = game::read_entity_system(memory, client.base);
+    const auto bomb = entity_system ? game::read_bomb(memory, client.base, *entity_system) : std::nullopt;
+    const float left = bomb ? bomb->blow_time - globals.curtime : 0.0f;
+    // A ticking bomb has between 0 and its whole fuse left; a defused or exploded one may be past it.
+    const bool sane = bomb && (bomb->defused || bomb->exploded || (left >= 0.0f && left <= bomb->timer_length));
+    tally.check(sane, bomb ? std::format("{:<26} 0x{:X}, site {}, {:.1f} s of {:.0f} s left{}{}{}",
+                                         "Bomb (dwPlantedC4)", bomb->entity, bomb->site, left, bomb->timer_length,
+                                         bomb->being_defused ? ", being defused" : "", bomb->defused ? ", defused" : "",
+                                         bomb->exploded ? ", exploded" : "")
+                           : std::format("{:<26} planted, but dwPlantedC4 (0x{:X}) didn't read as a live bomb",
+                                         "Bomb (dwPlantedC4)",
+                                         memory.read<std::uintptr_t>(client.base + offsets::client::dwPlantedC4)
+                                             .value_or(0)));
+}
+
 // --- 6. Match reads (only in a match) ------------------------------------------------------------------------------
-// The hand-found layouts the dumps can't vouch for (CGlobalVars, the bone array), checked on live players.
+// The hand-found layouts the dumps can't vouch for (CGlobalVars, the bone array), checked on live players, and the
+// planted bomb when there is one.
 void check_match(Tally& tally, const core::Memory& memory, const core::ModuleInfo& client)
 {
     const game::GameSnapshot game = game::read_game(memory, client.base);
@@ -280,7 +312,7 @@ void check_match(Tally& tally, const core::Memory& memory, const core::ModuleInf
         logger::info("Match reads: not in a match, skipped (join Practice with Bots to check globals and bones)");
         return;
     }
-    logger::info("Match reads (hand-found layouts: CGlobalVars, bones)");
+    logger::info("Match reads (hand-found layouts: CGlobalVars, bones; the bomb)");
     const game::GlobalVars& globals = game.globals;
     tally.check(globals.is_sane(), std::format("{:<26} map {}, max clients {}, tick interval {:.4f}", "CGlobalVars",
                                                globals.map_name.empty() ? "?" : globals.map_name, globals.max_clients,
@@ -312,6 +344,7 @@ void check_match(Tally& tally, const core::Memory& memory, const core::ModuleInf
                 std::format("{:<26} {} of {} alive players; head bone {:.0f} to {:.0f} units above the feet",
                             "Bones (model state + 0x80)", with_bones, alive, with_bones > 0 ? lowest_head : 0.0f,
                             with_bones > 0 ? highest_head : 0.0f));
+    check_bomb(tally, memory, client, globals);
 }
 } // namespace
 
