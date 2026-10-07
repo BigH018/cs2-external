@@ -1,5 +1,6 @@
 #include "game/player.h"
 
+#include <cmath>
 #include <utility>
 
 #include "config.h"
@@ -54,6 +55,11 @@ void read_pawn(const core::Memory& memory, std::uintptr_t entity_system, std::ui
     player.alive = controller_alive && *life_state == 0 && *health > 0;
     player.origin = *origin;
     player.view_offset = view_offset && view_offset->is_finite() ? *view_offset : maths::Vec3{};
+    if (const auto eyes = memory.read<maths::Angles>(pawn + schema::C_CSPlayerPawn::m_angEyeAngles);
+        eyes && std::isfinite(eyes->pitch) && std::isfinite(eyes->yaw))
+    {
+        player.eye_angles = *eyes;
+    }
     player.dormant = read_flag(memory, *scene_node + schema::CGameSceneNode::m_bDormant);
     player.armor = memory.read<std::int32_t>(pawn + schema::C_CSPlayerPawn::m_ArmorValue).value_or(0);
     player.flags = memory.read<std::uint32_t>(pawn + base_entity::m_fFlags).value_or(0);

@@ -99,6 +99,9 @@ inline constexpr Range<float> kAimSmoothing{1.0f, 30.0f};    // 1 = snap
 inline constexpr Range<int> kTriggerReaction{0, 500};        // ms
 inline constexpr Range<int> kTriggerShotDelay{20, 1000};     // ms
 inline constexpr Range<int> kTriggerBurst{2, 10};            // shots
+inline constexpr Range<float> kRadarSize{150.0f, 600.0f};    // pixels
+inline constexpr Range<float> kRadarRange{10.0f, 150.0f};    // metres from the centre to the edge
+inline constexpr Range<float> kRadarDotSize{2.0f, 8.0f};     // pixels (radius)
 
 // --- Aimbot and triggerbot (Phase 5) -------------------------------------------------------------------------------
 // Smoothing is defined per 60 Hz frame (1 / smoothing of the remaining angle each 1/60 s), then scaled to the real
@@ -122,6 +125,13 @@ inline constexpr float kEspHealthBarWidth = 3.0f;    // pixels
 inline constexpr float kEspHealthBarGap = 3.0f;      // pixels between the box and the health bar
 inline constexpr float kEspCornerFraction = 0.25f;   // corner box: each corner's arms = this much of the side
 inline constexpr std::size_t kEspMaxNameLength = 20; // longer names are cut with "..."
+
+// --- Radar (Phase 6) -----------------------------------------------------------------------------------------------
+inline constexpr float kRadarMargin = 10.0f;        // pixels from the corner of the game window
+inline constexpr float kRadarFacingLength = 2.5f;   // a facing line is this many dot radii long
+inline constexpr float kRadarYouSize = 1.8f;        // your arrow, in dot radii
+inline constexpr float kRadarEdgeFade = 0.55f;      // alpha factor for players clamped to the edge
+inline constexpr float kRadarNorthUpYaw = 90.0f;    // rotation off: the radar looks along +y (the game's radar north)
 
 // --- Timing --------------------------------------------------------------------------------------------------------
 inline constexpr std::uint32_t kStatusIntervalMs = 250;     // match status read on the Home page (~4 Hz)

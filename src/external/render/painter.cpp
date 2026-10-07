@@ -43,6 +43,17 @@ public:
         draw_.AddCircle(to_imvec(circle.centre), circle.radius, to_u32(circle.colour), 0, circle.thickness);
     }
 
+    void operator()(const FilledCircle& circle) const
+    {
+        draw_.AddCircleFilled(to_imvec(circle.centre), circle.radius, to_u32(circle.colour));
+    }
+
+    void operator()(const FilledTriangle& triangle) const
+    {
+        draw_.AddTriangleFilled(to_imvec(triangle.a), to_imvec(triangle.b), to_imvec(triangle.c),
+                                to_u32(triangle.colour));
+    }
+
     void operator()(const Text& text) const
     {
         const ImVec2 size = font_->CalcTextSizeA(font_size_, FLT_MAX, 0.0f, text.text.c_str());
@@ -53,6 +64,10 @@ public:
         case TextAnchor::top_centre: at.x -= size.x * 0.5f; break;
         case TextAnchor::bottom_centre:
             at.x -= size.x * 0.5f;
+            at.y -= size.y;
+            break;
+        case TextAnchor::bottom_right:
+            at.x -= size.x;
             at.y -= size.y;
             break;
         case TextAnchor::top_left: break;

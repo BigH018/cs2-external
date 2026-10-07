@@ -21,6 +21,7 @@ enum class TextAnchor : std::uint8_t
     top_right,
     top_centre,
     bottom_centre,
+    bottom_right,
 };
 
 struct Line
@@ -56,6 +57,21 @@ struct Circle
     float thickness = 1.0f;
 };
 
+struct FilledCircle
+{
+    maths::Vec2 centre;
+    float radius = 0.0f;
+    Color colour;
+};
+
+struct FilledTriangle
+{
+    maths::Vec2 a;
+    maths::Vec2 b;
+    maths::Vec2 c;
+    Color colour;
+};
+
 // One line of text with a dark shadow under it.
 struct Text
 {
@@ -65,5 +81,5 @@ struct Text
     TextAnchor anchor = TextAnchor::top_left;
 };
 
-using Primitive = std::variant<Line, Rect, FilledRect, Circle, Text>;
+using Primitive = std::variant<Line, Rect, FilledRect, Circle, FilledCircle, FilledTriangle, Text>;
 } // namespace render

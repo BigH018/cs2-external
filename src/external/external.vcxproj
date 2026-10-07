@@ -65,6 +65,7 @@
     <ClCompile Include="features\aimbot.cpp" />
     <ClCompile Include="features\esp.cpp" />
     <ClCompile Include="features\feature_summary.cpp" />
+    <ClCompile Include="features\radar.cpp" />
     <ClCompile Include="features\targeting.cpp" />
     <ClCompile Include="features\triggerbot.cpp" />
     <ClCompile Include="game\bones.cpp" />
@@ -115,6 +116,7 @@
     <ClInclude Include="features\aimbot.h" />
     <ClInclude Include="features\esp.h" />
     <ClInclude Include="features\feature_summary.h" />
+    <ClInclude Include="features\radar.h" />
     <ClInclude Include="features\targeting.h" />
     <ClInclude Include="features\triggerbot.h" />
     <ClInclude Include="game\bones.h" />

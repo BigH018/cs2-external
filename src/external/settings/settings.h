@@ -168,6 +168,41 @@ struct TriggerbotSettings
     bool head_only = false;          // only when the crosshair is on the head
 };
 
+// Which corner of the game window the radar sits in.
+enum class RadarCorner : std::uint8_t
+{
+    top_left, // over the game's own radar (and the watermark: move one of them)
+    top_right,
+    bottom_left,
+    bottom_right,
+};
+
+struct RadarColours
+{
+    Color enemy_visible = Color::rgb(0xF25C5C);
+    Color enemy_hidden = Color::rgb(0xF2B35C);
+    Color team = Color::rgb(0x5CA8F2);
+    Color you = Color::rgb(0xEDEBF7);
+    Color background = Color::rgb(0x0E1220, 0.72f);
+};
+
+// Our own radar, drawn by the overlay (not the game's): you in the middle, every player as a dot.
+struct RadarSettings
+{
+    bool enabled = false;
+    RadarCorner corner = RadarCorner::top_right;
+    float size = 260.0f;         // pixels, the side of the square (config::kRadarSize)
+    float range = 40.0f;         // metres from you to the edge (config::kRadarRange)
+    bool rotate = true;          // where you look is up; off = the map's north (+y) is up, like the game's radar
+    bool show_teammates = true;  // teams mode only
+    bool facing = true;          // a short line from each dot the way that player looks
+    bool names = false;
+    bool clamp_to_edge = true;   // players out of range sit on the edge (faded) instead of disappearing
+    float dot_size = 4.0f;       // pixels, a dot's radius (config::kRadarDotSize)
+    bool visibility_colours = true; // enemy visible / hidden colours from the spotted-by heuristic
+    RadarColours colours;
+};
+
 struct Settings
 {
     OverlaySettings overlay;
@@ -175,5 +210,6 @@ struct Settings
     EspSettings esp;
     AimbotSettings aimbot;
     TriggerbotSettings triggerbot;
+    RadarSettings radar;
 };
 } // namespace settings

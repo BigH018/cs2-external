@@ -47,6 +47,7 @@ struct PlayerSnapshot
     std::int32_t armor = 0;
     maths::Vec3 origin;            // feet
     maths::Vec3 view_offset;       // eye height above the feet
+    maths::Angles eye_angles;      // m_angEyeAngles: where the player looks (the radar's facing lines)
     bool dormant = false;
     std::uint32_t flags = 0;       // m_fFlags (bit 0 = on the ground)
     bool scoped = false;

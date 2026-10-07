@@ -10,6 +10,7 @@
 #include "game/schema.h"
 #include "helpers/fake_entities.h"
 #include "helpers/fake_memory.h"
+#include "maths/angles.h"
 #include "maths/projection.h"
 #include "maths/vec.h"
 
@@ -47,6 +48,7 @@ struct FakePlayer
     std::int32_t armor = 50;
     maths::Vec3 origin{278.5f, -874.9f, -163.2f};
     maths::Vec3 view_offset{0.0f, 0.0f, 64.0f};
+    maths::Angles eye_angles{12.5f, -135.0f};
     std::uint32_t flags = game::kFlagOnGround;
     bool scoped = false;
     std::uint16_t weapon_id = 7;
@@ -86,6 +88,7 @@ void add_player(test::FakeMemory& memory, FakeEntityList& list, const FakePlayer
     memory.put<std::uint32_t>(pawn + schema::C_BaseEntity::m_fFlags, player.flags);
     memory.put<maths::Vec3>(pawn + schema::C_BaseModelEntity::m_vecViewOffset, player.view_offset);
     memory.put<std::int32_t>(pawn + schema::C_CSPlayerPawn::m_ArmorValue, player.armor);
+    memory.put<maths::Angles>(pawn + schema::C_CSPlayerPawn::m_angEyeAngles, player.eye_angles);
     memory.put<std::uint8_t>(pawn + schema::C_CSPlayerPawn::m_bIsScoped, player.scoped ? 1 : 0);
     memory.put<maths::Vec3>(node + schema::CGameSceneNode::m_vecAbsOrigin, player.origin);
     memory.put<std::uintptr_t>(pawn + schema::C_BasePlayerPawn::m_pWeaponServices, services);
@@ -159,6 +162,7 @@ TEST_CASE("read_player: controller + pawn")
     CHECK(player->armor == 50);
     CHECK(player->origin == maths::Vec3{278.5f, -874.9f, -163.2f});
     CHECK(player->eye_position() == maths::Vec3{278.5f, -874.9f, -163.2f + 64.0f});
+    CHECK(player->eye_angles == maths::Angles{12.5f, -135.0f});
     CHECK(player->on_ground());
     CHECK(player->scoped);
     CHECK_FALSE(player->dormant);

@@ -55,8 +55,8 @@ bool team_mode_combo(settings::TeamMode& mode)
     ImGui::SetNextItemWidth(scaled(180.0f));
     const bool changed = combo("Team mode", mode, kTeamModes, 2);
     ImGui::SameLine();
-    widgets::help_marker("Who counts as an enemy, for every feature (ESP, aimbot, triggerbot). Teams: the other "
-                         "team. Free for all: everyone else (CS2 deathmatch is free for all).");
+    widgets::help_marker("Who counts as an enemy, for every feature (ESP, aimbot, triggerbot, radar). Teams: the "
+                         "other team. Free for all: everyone else (CS2 deathmatch is free for all).");
     return changed;
 }
 

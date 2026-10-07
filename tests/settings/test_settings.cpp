@@ -47,6 +47,17 @@ TEST_CASE("Settings defaults: aimbot and triggerbot off, every number inside its
     CHECK(input::key_index(trigger.key) >= 0);
 }
 
+TEST_CASE("Settings defaults: radar off, every number inside its range")
+{
+    const settings::RadarSettings radar = settings::Settings{}.radar;
+    CHECK_FALSE(radar.enabled);
+    CHECK(radar.corner == settings::RadarCorner::top_right); // clear of the watermark and the game's radar
+    CHECK(config::kRadarSize.contains(radar.size));
+    CHECK(config::kRadarRange.contains(radar.range));
+    CHECK(config::kRadarDotSize.contains(radar.dot_size));
+    CHECK(radar.colours.background.a < 1.0f); // see-through
+}
+
 TEST_CASE("input::kBindableKeys: names and indices")
 {
     CHECK(input::key_name(0x01) == "Mouse 1");

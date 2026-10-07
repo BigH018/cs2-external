@@ -14,6 +14,7 @@
 #include "features/activation.h"
 #include "features/aimbot.h"
 #include "features/esp.h"
+#include "features/radar.h"
 #include "features/triggerbot.h"
 #include "game/offsets.h"
 #include "game/player.h"
@@ -142,6 +143,7 @@ private:
         state_.active.esp = settings.esp.enabled;
         state_.active.aimbot = settings.aimbot.enabled;
         state_.active.triggerbot = settings.triggerbot.enabled;
+        state_.active.radar = settings.radar.enabled;
         read_game();
 
         // Aiming and firing only while you're playing: the game in front, the menu closed.
@@ -223,7 +225,8 @@ private:
     void read_game()
     {
         const std::uint64_t now = GetTickCount64();
-        const bool every_frame = state_.active.esp || state_.active.aimbot || state_.active.triggerbot;
+        const bool every_frame =
+            state_.active.esp || state_.active.aimbot || state_.active.triggerbot || state_.active.radar;
         if (!every_frame && now < next_status_ms_)
         {
             return;
@@ -346,7 +349,8 @@ private:
         }
     }
 
-    // Under the watermark and the menu, on ImGui's background draw list: the ESP and the aimbot's FOV circle.
+    // Under the watermark and the menu, on ImGui's background draw list: the ESP, the aimbot's FOV circle and the
+    // radar.
     void draw_world()
     {
         const maths::Vec2 screen{static_cast<float>(state_.overlay_width), static_cast<float>(state_.overlay_height)};
@@ -361,6 +365,9 @@ private:
                 primitives.push_back(*circle);
             }
         }
+        const std::vector<render::Primitive> radar =
+            features::build_radar(state_.snapshot, state_.settings.radar, state_.settings.general.team_mode, screen);
+        primitives.insert(primitives.end(), radar.begin(), radar.end());
         render::paint(*ImGui::GetBackgroundDrawList(), primitives, imgui_.fonts().regular, font_size);
     }
 
