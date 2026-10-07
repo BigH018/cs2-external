@@ -300,7 +300,8 @@ cs2-external/
       game/                       (THE ONLY place that dereferences game memory)
         offsets.h                 ✅ PURE: all 29 dumped globals, 16 buttons, 4 interface RVAs, kDumpBuildNumber,
                                      8 signatures (Signature + signatures::kClient), hand-found layouts (layout::)
-        schema.h                  ✅ PURE: 30 field offsets in 14 classes (from dumps/client_dll.json) + kFields
+        schema.h                  ✅ PURE: 44 field offsets in 17 classes (from dumps/client_dll.json) + kFields (43:
+                                     CEntityInstance::m_pEntity isn't live-schema checkable)
         interfaces.h/.cpp         ✅ PURE: CreateInterface from outside (export → InterfaceReg list walk, lea/ret
                                      create functions decoded, not called)
         schema_system.h/.cpp      ✅ PURE: find_type_scope (SchemaSystem_001), index_classes (self-pointing class
@@ -308,11 +309,13 @@ cs2-external/
         signatures.h/.cpp         ✅ PURE: resolve_signature over a module copy (several hits must agree)
         snapshot.h                ✅ PURE data: Team, PlayerSnapshot (controller + pawn copy, pawn_index, eye_angles,
                                      eye_position, head_position, on_ground), LocalState (crosshair entity, flash, view angles),
-                                     GameSnapshot (globals, view matrix if sane, players, local())
+                                     PlantedBomb, GameSnapshot (globals, view matrix if sane, players, bomb, local())
         player.h/.cpp             ✅ read_local_pawn; read_player (controller → pawn, validity checks: garbage pawn
                                      dropped); read_game (entity system, globals, view, every controller)
         entities.h/.cpp           ✅ designer_name, find_player_controllers (indices 1..maxClients,
                                      "cs_player_controller")
+        bomb.h/.cpp               ✅ read_bomb (dwPlantedC4 → C_PlantedC4, handle round-trip guard), read_planted_bomb,
+                                     read_bomb_planted (game rules, for --diag)
         handle.h/.cpp             ✅ read_entity_system, identity_address, entity_at, resolve_handle (serial check)
         view.h/.cpp               ✅ read_view_matrix (client.dll + dwViewMatrix, inline 4x4)
         bones.h/.cpp              ✅ read_bones: scene node + m_modelState + 0x80 → 23 bone positions in one read,
@@ -341,6 +344,8 @@ cs2-external/
         feature_summary.h/.cpp    ✅ ActiveFeatures + feature_summary() → "ESP · Aimbot" for the watermark
         radar.h/.cpp              ✅ radar_panel (corner), radar_offset / radar_direction (world → radar, rotated or
                                      north-up), clamp_to_square, build_radar → primitives (dots, facing, names, edge)
+        bomb_timer.h/.cpp         ✅ bomb_timer_info (phase, time left, defuse verdict, defuser, distance),
+                                     build_bomb_timer → the top-centre panel
       render/
         primitives.h              ✅ Line, Rect, FilledRect, Circle, FilledCircle, FilledTriangle, Text (+ TextAnchor),
                                      Primitive variant (PURE)
@@ -422,6 +427,8 @@ cs2-external/
     features/test_feature_summary.cpp ✅ the watermark's feature line (empty, one, order, all)
     features/test_radar.cpp       ✅ corners, world → radar (rotated / north-up), directions, edge clamping, filters,
                                      colours, facing lines, names
+    features/test_bomb_timer.cpp  ✅ defuse verdict, phases, time left, defuse in time / late, defuser, panel rows
+    game/test_bomb.cpp            ✅ game rules flag, C_PlantedC4 read + garbage, read_bomb (none, live, stale pointer)
     settings/test_settings.cpp    ✅ defaults inside their ranges (ESP, aimbot, triggerbot, radar), bindable keys,
                                      config::Range
     settings/test_profile_json.cpp 🔲 [8]
@@ -570,6 +577,10 @@ You may change an offset **only if** you:
 | `m_flFlashDuration` | `C_CSPlayerPawnBase` | `0x1510` | triggerbot "don't fire while flashed" |
 | `jump` | `buttons.json`, client.dll | `0x22324E0` | (unused since bunny hop was dropped; format proven) |
 | `attack` | `buttons.json`, client.dll | `0x2231FD0` | triggerbot |
+| `dwPlantedC4` | client.dll → `C_PlantedC4*` | `0x24CA930` | bomb timer (0 = no bomb) |
+| `m_pEntity` | `CEntityInstance` | `0x10` | bomb timer stale-pointer guard (the identity) |
+| `m_bBombPlanted` | `C_CSGameRules` (via `dwGameRules`) | `0x8C7` | `--diag` cross-check |
+| `m_flC4Blow`, `m_nBombSite`, `m_bBeingDefused`, `m_flDefuseCountDown`, ... | `C_PlantedC4` | `0x12B8`, `0x128C`, `0x12C4`, `0x12D8` | bomb timer (all 10 in `schema.h`) |
 
 Writing a button global is a game write: it needs `PROCESS_VM_WRITE | PROCESS_VM_OPERATION`, added in Phase 5 (with
 the aimbot's angle writes). The exact value format of a button write is verified in-game before it's used.
@@ -741,6 +752,14 @@ Rules:
   facing line per dot (`m_angEyeAngles`), optional names, out-of-range players faded on the edge (or hidden), a cross,
   a half-range ring and the range in metres. Rotate with view (where you look is up) or north-up like the game's
   radar. Its own colours, each with opacity. The watermark lists "Radar".
+- **Phase 6, bomb timer (done, verified in-game by the user 2026-10-07):** menu →
+  Misc → Bomb timer → Enabled (off by default). While a bomb is planted, a panel at the top-centre (height
+  adjustable): "BOMB A" and the seconds left, a bar coloured by whether a defuse started now makes it (green: without a
+  kit, yellow: only with a kit, red: too late) with two marks on it (yellow at 10 s left = the latest defuse without a
+  kit, red at 5 s = the latest with one) and the hint as a line, and while someone defuses: their name, the
+  defuse time left with a bar, "will make it" / "too late"; "DEFUSED" / "EXPLODED" at the end; your distance to the
+  bomb. Read-only: `client.dll + dwPlantedC4` points at the bomb from the plant until the next round (0 otherwise),
+  checked against the entity list every frame. `--diag`: 62 checks in a match, 63 while a bomb is down.
 
 ---
 
@@ -854,6 +873,14 @@ Rules:
   `std::uint8_t` and compares with 0.
 - **A garbage pawn is dropped, not half-trusted.** `read_player` fills the pawn part only after health (0..10000), the
   scene node and a finite position all read sanely; otherwise the snapshot keeps the controller part with pawn 0.
+- **`dwPlantedC4` points straight at the `C_PlantedC4`** (one dereference) from the plant to the next round start,
+  0 otherwise; the second dereference of public code is garbage, and `dwPlantedC4 - 0x8` is not a "planted" flag
+  (`0x800001BF` with and without a bomb). The bomb's identity has **no designer name**: don't look for it by name.
+- **Not every class in the dump is checkable in the live schema.** `CEntityInstance` (and other classes other
+  libraries register in the client scope) isn't one of client.dll's own class infos, so `--diag` reports "class not
+  found". Keep such fields out of `schema::kFields` and prove them another way.
+- **`dwGameRules` → `C_CSGameRules*`** (proven: round time 3600 in a 60-minute match). Its `m_bBombPlanted` is the
+  cheap "is there a bomb" gate.
 - **`dwNetworkGameClient_isBackgroundMap` (`0x2C143F`) looks wrong in the dump** (the other `dwNetworkGameClient_*`
   values are < 0x400). Don't use it without proof.
 
@@ -1107,7 +1134,10 @@ Bunny hop was dropped from this phase by the user on 2026-10-07.)
 One feature at a time, each with its own in-game check by the user (and its own commit after approval):
 - [x] **Radar** (`features/radar`, Misc page cards, `PlayerSnapshot::eye_angles`): built 2026-10-07, tests 138/138,
       screenshot over the live game OK. Verified in-game by the user (2026-10-07): all good, approved
-- [ ] **Bomb timer** (`dwPlantedC4` or the `planted_c4` entity; needs a defuse map, not Deathmatch, to test)
+- [x] **Bomb timer** (`game/bomb`, `features/bomb_timer`, `dwPlantedC4` → `C_PlantedC4`): built 2026-10-07; the first
+      version (designer-name search) showed nothing in the user's test and was replaced; the read path is proven live
+      (two plants, countdown vs curtime, `--diag` bomb check OK). Verified in-game by the user (2026-10-07); then, at
+      their request, two latest-defuse marks on the bar (10 s / 5 s). Tests 154/154
 - [ ] **Spectator list** (observer pawn → observer services → target handle; dead players watching you)
 - [ ] **Hitsound** (overlay audio; hit detection to be found, e.g. a hits / damage counter on the local player)
 - [ ] Misc page: every feature above with its options (radar done)
@@ -1267,7 +1297,12 @@ against the map's collision geometry, read from the game files (not from game me
   warnings, tests 138/138, `--diag` 50/50. **No offset changed** (`m_angEyeAngles` was already in `schema.h`; now
   read for every pawn, proven live).
 
-**Next:** Phase 6, bomb timer (then spectator list, then hitsound; one at a time, each checked by the user).
+- **Phase 6, bomb timer: done, verified in-game by the user (2026-10-07), committed and pushed** (with the two
+  latest-defuse marks the user asked for afterwards). First version (name search) didn't work in the user's test; now
+  `dwPlantedC4`, proven live. Debug + Release zero warnings, tests 154/154, `--diag` 62/62 (+ the bomb check OK while
+  a bomb ticked). **No offset changed**: 12 schema fields added from the dump.
+
+**Next:** Phase 6, spectator list (then hitsound; one at a time, each checked by the user).
 
 ---
 
@@ -1429,6 +1464,11 @@ against the map's collision geometry, read from the game files (not from game me
   (writing `m_bSpotted` on every bot) was not done: it's a write every frame for something a read-only drawing does
   as well. No map image underneath (that would mean parsing the map's overview from the game files); dots on a dark
   square, rotated with your view by default.
+- **2026-10-07 (Phase 6):** The bomb timer reads **`client.dll + dwPlantedC4` → `C_PlantedC4*`**, proven live on two
+  plants, with the bomb's handle round-trip through the entity list as the stale-pointer guard. A first version
+  searched the entity list for a guessed designer name (`planted_c4`) and showed nothing in the user's test: the
+  bomb's identity has no name. **User rule from this: never guess a name or offset; check the full dumper output
+  (`C:\Users\Harry\Desktop\output`) and prove it live first.**
 - **2026-10-07 (Phase 6):** Phase 6 runs **one feature per check**: build one, the user checks it in-game, commit,
   then the next (as the roadmap says), even with autonomous mode off and several features left.
 - **2026-10-06 (Phase 3):** Weapons are named from the **item definition index** (table in `game/weapon.cpp`), not the

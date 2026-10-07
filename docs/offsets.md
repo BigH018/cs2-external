@@ -42,7 +42,7 @@ are proven beyond "the dumper says so":
 | `dwViewMatrix` | client.dll | `0x2567FA0` | Signature (1 hit) = dump; row 0 read non-zero in a match. |
 | `dwGlobalVars` | client.dll | `0x222DE98` | Signature (1 hit) = dump. |
 | `dwGameRules` | client.dll | `0x255EE50` | Signature (2 hits, same target) = dump. |
-| `dwPlantedC4` | client.dll | `0x24CA930` | Signature (1 hit) = dump; reads 0 with no bomb planted. |
+| `dwPlantedC4` | client.dll | `0x24CA930` | Signature (1 hit) = dump; 0 with no bomb, `C_PlantedC4*` from plant to next round (proven live, Phase 6). |
 | `dwCSGOInput` | client.dll | `0x2578160` | Signature (1 hit) = dump. |
 | `dwPrediction` | client.dll | `0x2562710` | The local pawn signature's target before `+0xF8`. |
 | `dwBuildNumber` | engine2.dll | `0x61CFE8` | Reads 14189 = `info.json`. |
@@ -134,6 +134,12 @@ fields of the 469 live client classes with the dump: 0 mismatches.
 | `C_EconEntity` | `m_AttributeManager` | `0x1290` | weapon id chain |
 | `C_AttributeContainer` | `m_Item` | `0x50` | weapon id chain |
 | `C_EconItemView` | `m_iItemDefinitionIndex` | `0x1BA` | weapon id chain |
+| `CEntityInstance` | `m_pEntity` | `0x10` | the entity's identity: bomb timer stale-pointer check (not live-schema checkable, see "Planted bomb") |
+| `C_CSGameRules` | `m_bBombPlanted` | `0x8C7` | bomb timer: is a bomb down (Phase 6) |
+| `C_PlantedC4` | `m_bBombTicking` / `m_nBombSite` | `0x1288` / `0x128C` | bomb timer (site: 0 = A, 1 = B) |
+| | `m_flC4Blow` / `m_bHasExploded` / `m_flTimerLength` | `0x12B8` / `0x12BD` / `0x12C0` | bomb timer (blow = game time) |
+| | `m_bBeingDefused` / `m_flDefuseLength` / `m_flDefuseCountDown` | `0x12C4` / `0x12D4` / `0x12D8` | bomb timer, defuse |
+| | `m_bBombDefused` / `m_hBombDefuser` | `0x12DC` / `0x12E0` | bomb timer, defuse |
 
 **Weapon id chain:** weapon + `0x1290` + `0x50` + `0x1BA` = weapon + **`0x149A`** (uint16). Proven 2026-10-06: the local
 player's active weapon (identity designer name `weapon_ak47`) reads **7** there (the AK-47's definition index);
@@ -274,6 +280,40 @@ head, feet on the box's bottom edge.
 1000 and 5000 units, with w equal to the distance. 100 units up → y 467.6 (up the screen); 100 units right (yaw - 90°)
 → x 1032; 1000 units behind → w = -1000. So: pitch positive = looking down, screen y grows downwards, w < 0 behind.
 The matrix and points are in `tests/maths/test_projection.cpp`.
+
+## Planted bomb (`game/bomb`, Phase 6)
+
+**Game rules:** `client.dll + dwGameRules` → `C_CSGameRules*` (pointer, then the object). Proven 2026-10-07 (build
+14189, de_mirage Deathmatch, read-only script): `m_iRoundTime` (`+0x68`) read 3600 (the user's 60-minute round),
+`m_fRoundStartTime` a game time, `m_bMapHasBombTarget` (`+0x99`) 1 on mirage, `m_bBombPlanted` (`+0x8C7`) 0. `--diag`
+counts the read as a check ("Game rules").
+
+**Finding the bomb: `client.dll + dwPlantedC4` → `C_PlantedC4*`** (one dereference). The value `0x24CA930` matches
+the full dumper output (`C:\Users\Harry\Desktop\output\offsets.hpp`, build 14189); the dump doesn't say what it
+points to, so that was proven live 2026-10-07 (de_mirage bot rounds with a bomb, read-only script):
+- No bomb (Deathmatch, or before the plant): 0. From the plant until the next round starts: a `C_PlantedC4`
+  (`m_flTimerLength` 40.0, `m_nBombSite` 0 = A). It stays set after a defuse (`m_bBombDefused` 1) and goes back to 0,
+  together with `m_bBombPlanted`, when the next round starts. Seen on two plants.
+- The second dereference (the "pointer to a list" reading of public code) is garbage (timer 1.5e22).
+- `dwPlantedC4 - 0x8` reads `0x800001BF` with and without a bomb: it is not a "planted" flag.
+- **Countdown:** right after a plant, `m_flC4Blow - curtime` = 39.78 of 40, then 38.78, 37.78, 36.78 one second
+  apart: same clock as `CGlobalVars::curtime`. `--diag` during that round: "Bomb (dwPlantedC4) site 0, 18.0 s of 40 s
+  left", OK.
+
+**Stale-pointer guard:** the bomb's `CEntityInstance::m_pEntity` (`+0x10`, dump: `CEntityIdentity*`) is its identity;
+its handle must resolve through the entity list back to the same entity. Proven live: handle `0x1F300E8` (index 232),
+the list's slot 232 is that identity and holds that entity. `m_pEntity` can't be in `schema::kFields`: its class info
+isn't one of client.dll's own (`--diag` said "class not found in the live schema"), so the bomb check stands in for it.
+
+**Not by designer name.** The first version of the bomb timer (never committed) searched the entity list for
+`planted_c4`, a guessed name, and found nothing in-game (user report): the bomb's identity has **no designer name**
+(its name pointer is null), no entity in the match has "c4" or "planted" in its name (only `func_bomb_target`), and the
+dumper output names nothing of the kind. Search removed.
+
+**Fields:** `C_PlantedC4` from the dump (table above): all 10 matched the live schema system and the full dumper
+output (`client_dll.hpp`, with types: `m_flC4Blow` / `m_flDefuseCountDown` `GameTime_t`, `m_nBombSite` int32,
+`m_flTimerLength` / `m_flDefuseLength` float32, `m_hBombDefuser` `CHandle<C_CSPlayerPawn>`). The scene node gives the
+position (`m_pGameSceneNode` → `m_vecAbsOrigin`, as for pawns).
 
 ## Spotted-by mask (`game/visibility`)
 

@@ -344,3 +344,37 @@ the 3 red dots on the game's own radar, and the bot in the doorway ahead sat jus
 **Not verified (needs the user in-game):** the Misc page controls, rotation off, other corners and sizes, moving
 around (dots tracking smoothly), teams vs free-for-all.
 **User check (2026-10-07):** all good in-game; approved for commit.
+
+## 2026-10-07: Phase 6, bomb timer (2 of 4)
+
+Radar approved by the user and committed. Next: the **bomb timer** (read-only).
+
+**First version: wrong.** It searched the entity list for the designer name `planted_c4`, a guess, gated by
+`C_CSGameRules::m_bBombPlanted`. The user planted a bomb and saw nothing. Read live: the bomb's identity has no
+designer name at all, and the dumper output names nothing like it. The user asked not to guess and to check the full
+dumper output (`C:/Users/Harry/Desktop/output`): it has `dwPlantedC4` = `0x24CA930` (same as ours) and the
+`C_PlantedC4` fields (all matching), but no layout for the global, so that was proven live:
+- `client.dll + dwPlantedC4` → the `C_PlantedC4` itself (one dereference), 0 with no bomb, set from the plant to the
+  next round start (also after a defuse); seen on two plants.
+- Its identity's handle resolves back to it through the entity list (slot 232): used as the stale-pointer guard.
+- `m_flC4Blow - curtime` counted 39.78 → 36.78 over 3 s right after a plant: the same clock.
+- `--diag` while it ticked: "Bomb (dwPlantedC4) site 0, 18.0 s of 40 s left" OK.
+
+**What's in the code now**
+- `game/bomb`: `read_bomb` (dwPlantedC4 → stale guard → `read_planted_bomb`), `read_planted_bomb` (C_PlantedC4
+  fields, position, defuser pawn), `read_bomb_planted` (game rules, for `--diag`).
+- `features/bomb_timer` (pure): phase (ticking / defusing / defused / exploded), seconds and fraction left, the
+  defuse verdict (over 10 s: no kit needed, over 5 s: kit needed, else too late), a defuse in progress (time left, in
+  time or not, the defuser's name), distance; `build_bomb_timer` → a panel at the top-centre.
+- 11 schema fields from the dump (`C_CSGameRules::m_bBombPlanted`, 10 on `C_PlantedC4`), all matching the live schema;
+  `CEntityInstance::m_pEntity` (dump value, not live-schema checkable: `--diag` first reported it "class not found",
+  so it was taken out of `kFields`; the bomb check covers it).
+- `--diag`: game rules (a check) and, while a bomb is planted, the bomb read the overlay's way (a check): 62 checks
+  in a match, 63 with a bomb down.
+- Settings: `BombTimerSettings` (off by default; height, defuse hint, distance); Misc page card.
+
+**Verified here:** Debug and Release zero warnings; tests 153/153; `--diag` all 62 OK (and the bomb check OK during a
+planted round).
+**User check (2026-10-07):** all works. The user asked for two lines on the countdown bar: the latest a defuse can
+start without a kit (10 s left, yellow mark) and with one (5 s, red mark); added (`BarMark` in `features/bomb_timer`,
+positions tested), everything else unchanged. Tests 154/154. Approved for commit.
