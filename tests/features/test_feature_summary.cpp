@@ -21,8 +21,8 @@ TEST_CASE("active_feature_names: a single feature is just its name")
     CHECK(features::feature_summary(active) == "ESP");
 
     active = {};
-    active.hitsound = true;
-    CHECK(features::active_feature_names(active) == Names{"Hitsound"});
+    active.spectator_list = true;
+    CHECK(features::active_feature_names(active) == Names{"Spectators"});
 }
 
 TEST_CASE("active_feature_names: several features keep the fixed order, whatever was switched on first")
@@ -36,9 +36,8 @@ TEST_CASE("active_feature_names: several features keep the fixed order, whatever
 
 TEST_CASE("active_feature_names: everything on")
 {
-    const features::ActiveFeatures all{true, true, true, true, true, true, true};
+    const features::ActiveFeatures all{true, true, true, true, true, true};
     CHECK(features::active_feature_names(all) ==
-          Names{"ESP", "Aimbot", "Triggerbot", "Radar", "Bomb timer", "Spectators", "Hitsound"});
-    CHECK(features::feature_summary(all) ==
-          "ESP · Aimbot · Triggerbot · Radar · Bomb timer · Spectators · Hitsound");
+          Names{"ESP", "Aimbot", "Triggerbot", "Radar", "Bomb timer", "Spectators"});
+    CHECK(features::feature_summary(all) == "ESP · Aimbot · Triggerbot · Radar · Bomb timer · Spectators");
 }

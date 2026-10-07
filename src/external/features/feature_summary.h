@@ -21,7 +21,6 @@ struct ActiveFeatures
     bool radar = false;
     bool bomb_timer = false;
     bool spectator_list = false;
-    bool hitsound = false;
 };
 
 // The names of the features that are on, in the fixed order above ({"ESP", "Aimbot"}). Empty when nothing is on.

@@ -114,6 +114,5 @@ void draw_misc(PageContext& ctx)
     draw_radar_colours(ctx, radar);
     draw_bomb_timer(ctx, ctx.app.settings.bomb_timer);
     draw_spectators(ctx, ctx.app.settings.spectators);
-    widgets::planned_card(ctx.fonts, "Coming next (Phase 6)", {"Hitsound (played by the overlay, not the game)"});
 }
 } // namespace ui::pages

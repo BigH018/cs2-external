@@ -22,7 +22,6 @@ constexpr std::array kEntries = {
     Entry{&ActiveFeatures::radar, "Radar"},
     Entry{&ActiveFeatures::bomb_timer, "Bomb timer"},
     Entry{&ActiveFeatures::spectator_list, "Spectators"},
-    Entry{&ActiveFeatures::hitsound, "Hitsound"},
 };
 } // namespace
 

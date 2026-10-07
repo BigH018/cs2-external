@@ -417,3 +417,14 @@ in `read_player`, spectator filters, the dead-local path, panel rows / sides / e
 the build.
 **Not verified here:** the panel itself on screen, the Misc page controls, chase mode.
 **User (2026-10-07):** approved for commit.
+
+## 2026-10-07: Hitsound dropped, Phase 6 done
+
+Spectator list approved by the user and committed. The user then **dropped the hitsound** (Phase 6's last planned
+feature) before any work on it. Removed: `features::ActiveFeatures::hitsound` and its watermark name, the Misc page's
+"Coming next" card, and the plan entries in CLAUDE.md (§3, §13). `test_feature_summary` now uses the spectator list
+in place of the hitsound.
+
+**Verified here:** Debug and Release zero warnings; tests 167/167 in both.
+
+Phase 6 ends with the radar, the bomb timer and the spectator list. Next: Phase 7, keybind engine.

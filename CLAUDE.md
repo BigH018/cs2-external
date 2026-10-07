@@ -130,8 +130,8 @@ implementation:
   line. No menu-key hint.
 - ~~Player values (health / armour / ammo writes)~~: **dropped** by the user (2026-10-06). No Player page, no
   player-value writes.
-- **Radar / misc** (Phase 6): enlarged radar, enemy dots on radar, bomb timer, spectator list,
-  hitsound (via the overlay's own audio, not the game's).
+- **Radar / misc** (Phase 6): enlarged radar, enemy dots on radar, bomb timer, spectator list.
+- ~~Hitsound~~: **dropped** by the user (2026-10-07). No hitsound, no overlay audio.
 - **Keybinds** for every action, **profiles** saved as JSON, **panic key**, clean shutdown.
 - **Presets** (Off / Chill / Medium / Rage) that switch features and strengths.
 
@@ -383,7 +383,7 @@ cs2-external/
         pages/                    ✅ pages.h + one file per page: home (logo, live status, map/players/you), esp (every
                                      ESP option, colour pickers), aimbot and triggerbot (every option + live status),
                                      settings (overlay switches), misc (radar + radar colours, bomb timer, spectator
-                                     list; hitsound still listed as coming); controls.h/.cpp: shared check,
+                                     list); controls.h/.cpp: shared check,
                                      colour, combo, key_combo, team_mode_combo, max_distance_slider
       color.h                     ✅ Color (RGBA floats): rgb(0xRRGGBB), faded, lerp
       config.h                    ✅ PURE: branding, pointer bounds, page size, process/module names, --diag flag and
@@ -1153,9 +1153,9 @@ the menu is open or the game isn't focused; tests pass.
 **Honest note:** external aimbot cannot write angles on the game's logic thread, so the view will feel slightly
 laggier than an internal one. That's the cost of external. It's still usable for offline learning.
 
-### Phase 6: Misc: radar, bomb timer, spectators, hitsound
+### Phase 6: Misc: radar, bomb timer, spectators
 (Replaces the dropped "Player values" phase: no Player page, no health / armour / ammo writes, no Set / Freeze.
-Bunny hop was dropped from this phase by the user on 2026-10-07.)
+Bunny hop and the hitsound were dropped from this phase by the user on 2026-10-07.)
 One feature at a time, each with its own in-game check by the user (and its own commit after approval):
 - [x] **Radar** (`features/radar`, Misc page cards, `PlayerSnapshot::eye_angles`): built 2026-10-07, tests 138/138,
       screenshot over the live game OK. Verified in-game by the user (2026-10-07): all good, approved
@@ -1165,10 +1165,11 @@ One feature at a time, each with its own in-game check by the user (and its own 
       their request, two latest-defuse marks on the bar (10 s / 5 s). Tests 154/154
 - [x] **Spectator list** (`game/observer`, `features/spectators`, `render/panel`): built 2026-10-07, tests 167/167,
       `--diag` 67/67; the observer chain proven live (bots watching our pawn). Approved by the user (2026-10-07)
-- [ ] **Hitsound** (overlay audio; hit detection to be found, e.g. a hits / damage counter on the local player)
-- [ ] Misc page: every feature above with its options (radar, bomb timer, spectator list done)
-- [ ] Builds with zero warnings (Debug + Release); tests pass
-- [ ] Verified in-game by the user
+- ~~**Hitsound**~~: dropped by the user (2026-10-07), never built
+- [x] Misc page: every feature above with its options (radar, bomb timer, spectator list)
+- [x] Builds with zero warnings (Debug + Release); tests 167/167
+- [x] Verified in-game by the user: radar and bomb timer checked in-game; spectator list approved for commit
+      (2026-10-07)
 
 **Acceptance:** each misc feature does what its label says; nothing changes in the game while the menu is open or
 the game isn't focused; tests pass.
@@ -1333,7 +1334,10 @@ against the map's collision geometry, read from the game files (not from game me
   the chain proven live first (`docs/offsets.md` "Observer"). The bomb timer's panel code moved to `render/panel`
   (shared; the bomb timer draws the same).
 
-**Next:** Phase 6 hitsound.
+- **Hitsound dropped (2026-10-07, user decision):** removed from the plan, the Misc page's "Coming next" card and
+  `features::ActiveFeatures`. **Phase 6 is done.**
+
+**Next:** Phase 7, keybind engine.
 
 ---
 
@@ -1507,6 +1511,9 @@ against the map's collision geometry, read from the game files (not from game me
   while you're dead and watch someone in first/third person, of **that player** ("Watching Kev"). Free camera and the
   death cam count as watching nobody. The panel code the bomb timer had was moved to a shared `render/panel`
   (PanelWriter) instead of being copied. No colour pickers for the list: enemy red, teammate blue.
+- **2026-10-07 (user decision):** **Hitsound dropped.** Removed from §3, the Phase 6 plan, the Misc page's
+  "Coming next" card (the card is gone: nothing else was planned there) and `features::ActiveFeatures`. Phase 6 ends
+  with the radar, the bomb timer and the spectator list.
 - **2026-10-06 (Phase 3):** Weapons are named from the **item definition index** (table in `game/weapon.cpp`), not the
   designer name, because some weapons share a designer name (USP-S / P2000). Each also gets a `WeaponClass` for the
   Phase 5 triggerbot filter.
