@@ -103,7 +103,9 @@ The code uses the **dump values**; the signatures are the cross-check (and the w
 
 29 fields in 13 classes, copied by script from `client_dll.json` (Phase 2); `CSkeletonInstance::m_modelState` (320 =
 `0x140`) added in Phase 4, copied from the same dump (30 fields, 14 classes); `m_flFlashOverlayAlpha` (`0x1504`) and `m_flFlashMaxAlpha`
-(`0x150C`) added in Phase 5, same dump (32 fields; `--diag` 2026-10-07: live values match, all 50 checks OK). Proof: the diagnostic reads each one from the live
+(`0x150C`) added in Phase 5, same dump (32 fields; `--diag` 2026-10-07: live values match, all 50 checks OK). Phase 6
+added the bomb fields (below) and the four observer fields (`m_hObserverPawn` 2352, `m_pObserverServices` 4872,
+`m_iObserverMode` 72, `m_hObserverTarget` 76, copied by script; `--diag` 2026-10-07: all four match the live schema). Proof: the diagnostic reads each one from the live
 schema system and compares. 2026-10-06, build 14189: **all 29 matched**. The scratch script also compared all 3013
 fields of the 469 live client classes with the dump: 0 mismatches.
 
@@ -119,7 +121,9 @@ fields of the 469 live client classes with the dump: 0 mismatches.
 | `CSkeletonInstance` | `m_modelState` | `0x140` | bones (Phase 4; the pawn's scene node is a CSkeletonInstance) |
 | `C_BaseModelEntity` | `m_vecViewOffset` | `0xF60` | eye position |
 | `C_BasePlayerPawn` | `m_pWeaponServices` / `m_hController` | `0x12F0` / `0x14BC` | weapon, owner |
+| | `m_pObserverServices` | `0x1308` | spectator list (on the controller's observer pawn, Phase 6) |
 | `CPlayer_WeaponServices` | `m_hActiveWeapon` | `0x60` | weapon |
+| `CPlayer_ObserverServices` | `m_iObserverMode` / `m_hObserverTarget` | `0x48` / `0x4C` | spectator list (uint8 mode; target = a player pawn) |
 | `C_CSPlayerPawnBase` | `m_flFlashOverlayAlpha` / `m_flFlashMaxAlpha` | `0x1504` / `0x150C` | triggerbot "not while flashed" (Phase 5: flashed = alpha > half of max) |
 | | `m_flFlashDuration` | `0x1510` | (kept for reference; the alpha pair is what's used) |
 | `C_CSPlayerPawn` | `m_entitySpottedState` | `0x1E88` | visibility heuristic |
@@ -131,6 +135,7 @@ fields of the 469 live client classes with the dump: 0 mismatches.
 | `EntitySpottedState_t` | `m_bSpotted` / `m_bSpottedByMask` | `0x8` / `0xC` | visibility heuristic (bit per player slot) |
 | `CBasePlayerController` | `m_hPawn` / `m_iszPlayerName` | `0x6BC` / `0x6FC` | name |
 | `CCSPlayerController` | `m_hPlayerPawn` / `m_bPawnIsAlive` | `0x92C` / `0x934` | controller → pawn |
+| | `m_hObserverPawn` | `0x930` | spectator list: controller → observer pawn (Phase 6) |
 | `C_EconEntity` | `m_AttributeManager` | `0x1290` | weapon id chain |
 | `C_AttributeContainer` | `m_Item` | `0x50` | weapon id chain |
 | `C_EconItemView` | `m_iItemDefinitionIndex` | `0x1BA` | weapon id chain |
@@ -314,6 +319,30 @@ dumper output names nothing of the kind. Search removed.
 output (`client_dll.hpp`, with types: `m_flC4Blow` / `m_flDefuseCountDown` `GameTime_t`, `m_nBombSite` int32,
 `m_flTimerLength` / `m_flDefuseLength` float32, `m_hBombDefuser` `CHandle<C_CSPlayerPawn>`). The scene node gives the
 position (`m_pGameSceneNode` → `m_vecAbsOrigin`, as for pawns).
+
+## Observer (`game/observer`, spectator list, Phase 6)
+
+**Chain:** controller + `CCSPlayerController::m_hObserverPawn` (`0x930`) → handle → the observer pawn (identity
+designer name `c_cs_observer_for_precache`) + `C_BasePlayerPawn::m_pObserverServices` (`0x1308`) →
+`CPlayer_ObserverServices`: `m_iObserverMode` (`+0x48`, uint8) and `m_hObserverTarget` (`+0x4C`, handle). Field values
+from the dump (`client_dll.json` and the full output's `client_dll.hpp`, build 14189); the mode values from
+`ObserverMode_t` in the full output's `server_dll.hpp` (0 none, 1 fixed, 2 in-eye, 3 chase, 4 roaming; the client field
+is a uint8). What the dump doesn't say was proven live 2026-10-07 (build 14189, de_mirage round-based bot match,
+read-only scripts polling every 50 ms for several minutes):
+- **Every controller has an observer pawn with services, alive or not** (10 of 10). The *player* pawn's
+  `m_pObserverServices` is null on the client: read the observer pawn's.
+- **Living players keep a stale mode and target** (roaming / no target, or in-eye on whoever they last watched).
+  Only a dead player's (`m_bPawnIsAlive` 0) values mean anything.
+- **A player who dies:** `roaming` with target `0xFFFFFFFF` for ~4-5 s (the death cam), then `in-eye` with the target
+  = a **player pawn handle** (designer name `c_cs_player_for_precache`; resolves through the entity list with a
+  matching serial). Bots of both teams then watched **our pawn**: target `0x01E6810A` = our controller's
+  `m_hPlayerPawn`, exactly (bots spectate their killer). After a respawn their mode/target stay as they were (stale).
+- **Our own deaths:** our controller's observer services showed roaming for ~4 s, then in-eye on other players' pawns,
+  changing as those died: the "while dead, who watches the player you watch" path.
+- `--diag` (2026-10-07): "Observer services 10 of 10 controllers; 4 dead, 4 watching a player (4 of them a known
+  pawn)", all 67 checks OK. `--live` showed "watching Sox (1st person)" etc. for every dead bot.
+
+Chase (third person) mode wasn't seen (bots and the default camera use in-eye); it's treated like in-eye.
 
 ## Spotted-by mask (`game/visibility`)
 

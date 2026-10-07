@@ -378,3 +378,42 @@ planted round).
 **User check (2026-10-07):** all works. The user asked for two lines on the countdown bar: the latest a defuse can
 start without a kit (10 s left, yellow mark) and with one (5 s, red mark); added (`BarMark` in `features/bomb_timer`,
 positions tested), everything else unchanged. Tests 154/154. Approved for commit.
+
+## 2026-10-07: Phase 6, spectator list (3 of 4)
+
+Bomb timer approved and committed. Next: the **spectator list** (read-only).
+
+**Proven before coding** (the full dumper output, then live reads; CS2 build 14189, a round-based de_mirage bot
+match the user was playing): `CCSPlayerController::m_hObserverPawn` → observer pawn → `m_pObserverServices` →
+`m_iObserverMode` / `m_hObserverTarget`. A 25-minute read-only monitor logged every change: dead bots sit in roaming
+(death cam) for ~5 s, then watch a player pawn in first person; several bots of both teams watched **our pawn**
+(target handle = our `m_hPlayerPawn`). Living players keep stale values, so only dead players are read. Our own
+deaths showed us watching other pawns. Details: `docs/offsets.md` "Observer".
+
+**What's in the code now**
+- 4 schema fields from the dump (`m_hObserverPawn`, `m_pObserverServices`, `m_iObserverMode`, `m_hObserverTarget`),
+  all matching the live schema.
+- `game/observer`: `read_observer` (controller → observer pawn → services → mode + resolved target).
+  `game::ObserverMode` + `watches_target` in `snapshot.h`; `PlayerSnapshot::observer_mode` / `observer_target`, filled
+  by `read_player` for dead players only.
+- `features/spectators` (pure): `watched_pawn` (yours while alive, the one you watch while dead), `spectator_info`
+  (dead players in first / third person on it, enemy or teammate), `build_spectator_list` → a panel on the left or
+  right ("Spectators 2", one row per name with "1st person" / "3rd person", or "Nobody"; "Watching Kev" while dead).
+- `render/panel`: the bomb timer's panel writer (rows, bars with marks, background + border) moved out of
+  `features/bomb_timer` so both panels share it; the bomb timer draws the same as before (its tests unchanged).
+  `config::kBombPanelPadding` etc. became `kPanel*`.
+- Settings: `SpectatorSettings` (off by default; side, height, show the camera, hide when nobody watches); Misc page
+  card; the watermark lists "Spectators".
+- `--diag`: "Observer services" check (every controller's chain reads; every watched target is a known pawn): 67
+  checks in a match. `--live`: dead players show "watching X (1st person)" or "free camera".
+
+**Problems and fixes**
+- A Python heredoc collapsed `\b` into a backspace when editing the `.vcxproj` files (the known gotcha); redone with
+  the Edit tool.
+
+**Verified here:** Debug and Release zero warnings; tests 167/167 in both (+13: observer reads, the dead/alive gate
+in `read_player`, spectator filters, the dead-local path, panel rows / sides / empty / hidden, settings defaults);
+`--diag` all 67 OK; `--live` named whom every dead bot watched. The user's running `cs2_external.exe` was closed for
+the build.
+**Not verified here:** the panel itself on screen, the Misc page controls, chase mode.
+**User (2026-10-07):** approved for commit.

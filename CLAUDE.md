@@ -307,8 +307,9 @@ cs2-external/
         schema_system.h/.cpp      ✅ PURE: find_type_scope (SchemaSystem_001), index_classes (self-pointing class
                                      infos in a client.dll copy), read_class (live fields)
         signatures.h/.cpp         ✅ PURE: resolve_signature over a module copy (several hits must agree)
-        snapshot.h                ✅ PURE data: Team, PlayerSnapshot (controller + pawn copy, pawn_index, eye_angles,
-                                     eye_position, head_position, on_ground), LocalState (crosshair entity, flash, view angles),
+        snapshot.h                ✅ PURE data: Team, ObserverMode + watches_target, PlayerSnapshot (controller + pawn
+                                     copy, pawn_index, eye_angles, observer mode/target while dead, eye_position,
+                                     head_position, on_ground), LocalState (crosshair entity, flash, view angles),
                                      PlantedBomb, GameSnapshot (globals, view matrix if sane, players, bomb, local())
         player.h/.cpp             ✅ read_local_pawn; read_player (controller → pawn, validity checks: garbage pawn
                                      dropped); read_game (entity system, globals, view, every controller)
@@ -321,6 +322,7 @@ cs2-external/
         bones.h/.cpp              ✅ read_bones: scene node + m_modelState + 0x80 → 23 bone positions in one read,
                                      garbage rejected (non-finite, > 200 units from the feet)
         visibility.h/.cpp         ✅ player_slot, is_spotted_by (bit per slot), read_spotted_by_mask
+        observer.h/.cpp           ✅ read_observer: controller → m_hObserverPawn → observer services → mode + target
         writes.h/.cpp             ✅ the only game writes: set_button (65537 / 256), read/write_view_angles
         weapon.h/.cpp             ✅ read_active_weapon_id (pawn → services → handle → 0x149A), weapon_info (id →
                                      name + WeaponClass), weapon_class_name
@@ -346,10 +348,14 @@ cs2-external/
                                      north-up), clamp_to_square, build_radar → primitives (dots, facing, names, edge)
         bomb_timer.h/.cpp         ✅ bomb_timer_info (phase, time left, defuse verdict, defuser, distance),
                                      build_bomb_timer → the top-centre panel
+        spectators.h/.cpp         ✅ watched_pawn (you, or whom you watch while dead), spectator_info (dead players in
+                                     1st/3rd person on it), build_spectator_list → a side panel
       render/
         primitives.h              ✅ Line, Rect, FilledRect, Circle, FilledCircle, FilledTriangle, Text (+ TextAnchor),
                                      Primitive variant (PURE)
         painter.h/.cpp            ✅ paint(draw list, primitives, font, size): ImGui, text with a shadow
+        panel.h/.cpp              ✅ PanelWriter (PURE): rows, bars with marks, background + border (bomb timer,
+                                     spectator list)
       input/
         keys.h                    ✅ kBindableKeys (the keys Phase 5 features can use), key_name, key_index
         keys.cpp                  🔲 [7] every VK ↔ name, KeySet
@@ -358,7 +364,8 @@ cs2-external/
         key_poll.h/.cpp           🔲 [7] GetAsyncKeyState polling
         bind_capture.h/.cpp       🔲 [7] bind capture
       settings/
-        settings.h                ✅ Settings { overlay, general (team mode), esp, aimbot, triggerbot, radar } + enums
+        settings.h                ✅ Settings { overlay, general (team mode), esp, aimbot, triggerbot, radar,
+                                     bomb_timer, spectators } + enums
         profile_json.h/.cpp       🔲 [8]
         profile_store.h/.cpp      🔲 [8]
         presets.h/.cpp            🔲 [8]
@@ -375,8 +382,8 @@ cs2-external/
         hud.h/.cpp                ✅ watermark (logo + active features) + frame outline, background draw list
         pages/                    ✅ pages.h + one file per page: home (logo, live status, map/players/you), esp (every
                                      ESP option, colour pickers), aimbot and triggerbot (every option + live status),
-                                     settings (overlay switches), misc (radar + radar colours; bomb timer, spectators,
-                                     hitsound still listed as coming); controls.h/.cpp: shared check,
+                                     settings (overlay switches), misc (radar + radar colours, bomb timer, spectator
+                                     list; hitsound still listed as coming); controls.h/.cpp: shared check,
                                      colour, combo, key_combo, team_mode_combo, max_distance_slider
       color.h                     ✅ Color (RGBA floats): rgb(0xRRGGBB), faded, lerp
       config.h                    ✅ PURE: branding, pointer bounds, page size, process/module names, --diag flag and
@@ -429,7 +436,10 @@ cs2-external/
                                      colours, facing lines, names
     features/test_bomb_timer.cpp  ✅ defuse verdict, phases, time left, defuse in time / late, defuser, panel rows
     game/test_bomb.cpp            ✅ game rules flag, C_PlantedC4 read + garbage, read_bomb (none, live, stale pointer)
-    settings/test_settings.cpp    ✅ defaults inside their ranges (ESP, aimbot, triggerbot, radar), bindable keys,
+    game/test_observer.cpp        ✅ read_observer (in-eye, death cam, stale target, bad mode, broken chain), watches_target
+    features/test_spectators.cpp  ✅ who counts as a spectator, the dead-local path, panel rows / sides / empty / hidden
+    settings/test_settings.cpp    ✅ defaults inside their ranges (ESP, aimbot, triggerbot, radar, bomb timer,
+                                     spectators), bindable keys,
                                      config::Range
     settings/test_profile_json.cpp 🔲 [8]
     settings/test_profile_store.cpp 🔲 [8]
@@ -580,6 +590,9 @@ You may change an offset **only if** you:
 | `dwPlantedC4` | client.dll → `C_PlantedC4*` | `0x24CA930` | bomb timer (0 = no bomb) |
 | `m_pEntity` | `CEntityInstance` | `0x10` | bomb timer stale-pointer guard (the identity) |
 | `m_bBombPlanted` | `C_CSGameRules` (via `dwGameRules`) | `0x8C7` | `--diag` cross-check |
+| `m_hObserverPawn` | `CCSPlayerController` | `0x930` | spectator list (controller → observer pawn) |
+| `m_pObserverServices` | `C_BasePlayerPawn` (read on the observer pawn) | `0x1308` | spectator list |
+| `m_iObserverMode`, `m_hObserverTarget` | `CPlayer_ObserverServices` | `0x48`, `0x4C` | spectator list (2 = in-eye, 3 = chase; target = a player pawn) |
 | `m_flC4Blow`, `m_nBombSite`, `m_bBeingDefused`, `m_flDefuseCountDown`, ... | `C_PlantedC4` | `0x12B8`, `0x128C`, `0x12C4`, `0x12D8` | bomb timer (all 10 in `schema.h`) |
 
 Writing a button global is a game write: it needs `PROCESS_VM_WRITE | PROCESS_VM_OPERATION`, added in Phase 5 (with
@@ -760,6 +773,14 @@ Rules:
   defuse time left with a bar, "will make it" / "too late"; "DEFUSED" / "EXPLODED" at the end; your distance to the
   bomb. Read-only: `client.dll + dwPlantedC4` points at the bomb from the plant until the next round (0 otherwise),
   checked against the entity list every frame. `--diag`: 62 checks in a match, 63 while a bomb is down.
+- **Phase 6, spectator list (done, approved by the user 2026-10-07):** menu → Misc → Spectator list → Enabled (off
+  by default). A panel on the right (or left; height adjustable, default under the radar): "Spectators" and a count,
+  then every dead player watching you in first or third person, enemies red and teammates blue, with "1st person" /
+  "3rd person" (optional); "Nobody" when nobody watches (or no panel, optional). While you're dead and watch someone,
+  it says "Watching Kev" and lists who else watches them. Read-only: controller → observer pawn → observer services
+  (mode, target pawn), only for dead players. Bots watch their killer after a ~5 s death cam, so it fills in
+  round-based modes (Casual / Competitive), hardly in Deathmatch. `--live` shows whom each dead player watches.
+  `--diag`: 67 checks in a match.
 
 ---
 
@@ -879,6 +900,10 @@ Rules:
 - **Not every class in the dump is checkable in the live schema.** `CEntityInstance` (and other classes other
   libraries register in the client scope) isn't one of client.dll's own class infos, so `--diag` reports "class not
   found". Keep such fields out of `schema::kFields` and prove them another way.
+- **Observer services live on the observer pawn, and only dead players' values mean anything.** The player pawn's
+  `m_pObserverServices` is null on the client; read `m_hObserverPawn`'s. Every controller has an observer pawn even
+  while alive, with a stale mode/target (a respawned bot still "watches" whoever it last did). The target is a player
+  **pawn** handle; a fresh death shows roaming without a target for ~5 s (death cam) first.
 - **`dwGameRules` → `C_CSGameRules*`** (proven: round time 3600 in a 60-minute match). Its `m_bBombPlanted` is the
   cheap "is there a bomb" gate.
 - **`dwNetworkGameClient_isBackgroundMap` (`0x2C143F`) looks wrong in the dump** (the other `dwNetworkGameClient_*`
@@ -1138,9 +1163,10 @@ One feature at a time, each with its own in-game check by the user (and its own 
       version (designer-name search) showed nothing in the user's test and was replaced; the read path is proven live
       (two plants, countdown vs curtime, `--diag` bomb check OK). Verified in-game by the user (2026-10-07); then, at
       their request, two latest-defuse marks on the bar (10 s / 5 s). Tests 154/154
-- [ ] **Spectator list** (observer pawn → observer services → target handle; dead players watching you)
+- [x] **Spectator list** (`game/observer`, `features/spectators`, `render/panel`): built 2026-10-07, tests 167/167,
+      `--diag` 67/67; the observer chain proven live (bots watching our pawn). Approved by the user (2026-10-07)
 - [ ] **Hitsound** (overlay audio; hit detection to be found, e.g. a hits / damage counter on the local player)
-- [ ] Misc page: every feature above with its options (radar done)
+- [ ] Misc page: every feature above with its options (radar, bomb timer, spectator list done)
 - [ ] Builds with zero warnings (Debug + Release); tests pass
 - [ ] Verified in-game by the user
 
@@ -1302,7 +1328,12 @@ against the map's collision geometry, read from the game files (not from game me
   `dwPlantedC4`, proven live. Debug + Release zero warnings, tests 154/154, `--diag` 62/62 (+ the bomb check OK while
   a bomb ticked). **No offset changed**: 12 schema fields added from the dump.
 
-**Next:** Phase 6, spectator list (then hitsound; one at a time, each checked by the user).
+- **Phase 6, spectator list: done, approved by the user (2026-10-07), committed and pushed.** Debug +
+  Release zero warnings, tests 167/167, `--diag` 67/67. **No offset changed**: 4 schema fields added from the dump,
+  the chain proven live first (`docs/offsets.md` "Observer"). The bomb timer's panel code moved to `render/panel`
+  (shared; the bomb timer draws the same).
+
+**Next:** Phase 6 hitsound.
 
 ---
 
@@ -1471,6 +1502,11 @@ against the map's collision geometry, read from the game files (not from game me
   (`C:\Users\Harry\Desktop\output`) and prove it live first.**
 - **2026-10-07 (Phase 6):** Phase 6 runs **one feature per check**: build one, the user checks it in-game, commit,
   then the next (as the roadmap says), even with autonomous mode off and several features left.
+- **2026-10-07 (Phase 6):** The spectator list reads **every dead player's observer target** (controller →
+  `m_hObserverPawn` → observer services), proven live (bots watched our pawn). It lists spectators of **you**, or,
+  while you're dead and watch someone in first/third person, of **that player** ("Watching Kev"). Free camera and the
+  death cam count as watching nobody. The panel code the bomb timer had was moved to a shared `render/panel`
+  (PanelWriter) instead of being copied. No colour pickers for the list: enemy red, teammate blue.
 - **2026-10-06 (Phase 3):** Weapons are named from the **item definition index** (table in `game/weapon.cpp`), not the
   designer name, because some weapons share a designer name (USP-S / P2000). Each also gets a `WeaponClass` for the
   Phase 5 triggerbot filter.
