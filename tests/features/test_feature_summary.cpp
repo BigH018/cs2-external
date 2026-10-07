@@ -36,9 +36,9 @@ TEST_CASE("active_feature_names: several features keep the fixed order, whatever
 
 TEST_CASE("active_feature_names: everything on")
 {
-    const features::ActiveFeatures all{true, true, true, true, true, true, true, true};
+    const features::ActiveFeatures all{true, true, true, true, true, true, true};
     CHECK(features::active_feature_names(all) ==
-          Names{"ESP", "Aimbot", "Triggerbot", "Bunny hop", "Radar", "Bomb timer", "Spectators", "Hitsound"});
+          Names{"ESP", "Aimbot", "Triggerbot", "Radar", "Bomb timer", "Spectators", "Hitsound"});
     CHECK(features::feature_summary(all) ==
-          "ESP · Aimbot · Triggerbot · Bunny hop · Radar · Bomb timer · Spectators · Hitsound");
+          "ESP · Aimbot · Triggerbot · Radar · Bomb timer · Spectators · Hitsound");
 }

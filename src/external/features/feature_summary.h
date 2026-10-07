@@ -18,7 +18,6 @@ struct ActiveFeatures
     bool esp = false;
     bool aimbot = false;
     bool triggerbot = false;
-    bool bunny_hop = false;
     bool radar = false;
     bool bomb_timer = false;
     bool spectator_list = false;

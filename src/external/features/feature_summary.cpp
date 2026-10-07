@@ -19,7 +19,6 @@ constexpr std::array kEntries = {
     Entry{&ActiveFeatures::esp, "ESP"},
     Entry{&ActiveFeatures::aimbot, "Aimbot"},
     Entry{&ActiveFeatures::triggerbot, "Triggerbot"},
-    Entry{&ActiveFeatures::bunny_hop, "Bunny hop"},
     Entry{&ActiveFeatures::radar, "Radar"},
     Entry{&ActiveFeatures::bomb_timer, "Bomb timer"},
     Entry{&ActiveFeatures::spectator_list, "Spectators"},
