@@ -392,7 +392,7 @@ cs2-external/
         keybind_widgets.h/.cpp    ✅ key_button (capture, conflict colours), mode_selector, bind_row
         pages/                    ✅ pages.h + one file per page: home (logo, live status, map/players/you), esp (every
                                      ESP option, colour pickers), aimbot and triggerbot (every option + live status),
-                                     settings (Profiles, Presets, overlay switches), misc (radar + radar colours, bomb timer, spectator
+                                     settings (Profiles, Presets, overlay switches, Exit), misc (radar + radar colours, bomb timer, spectator
                                      list), keybinds (every action by category, conflicts, reset); bind rows on the
                                      feature pages; controls.h/.cpp: shared check, colour, combo, team_mode_combo,
                                      max_distance_slider
@@ -403,7 +403,7 @@ cs2-external/
       app/                        (the orchestrator, from AC: the only place that wires everything together)
         diagnostics.h/.cpp        ✅ the startup offset diagnostic: build, interfaces, signatures, schema, buttons/
                                      globals → console + OffsetReport for the Home page
-        frame.h/.cpp              ✅ app::run: loads the last profile, then the loop (pump → game window/focus →
+        frame.h/.cpp              ✅ app::run: loads the last profile, then the loop (errors caught: shutdown still runs) (pump → game window/focus →
                                      menu key → keybinds (capture, engine, panic/exit/on-off/presets) → requests
                                      (profile operations, presets) → snapshot → aimbot write → triggerbot attack write
                                      → draw → present) and the overlay's teardown
@@ -521,12 +521,14 @@ main loop (60+ Hz, or vsync-limited):
 ```
 
 ### 6.4 Shutdown (no unload sequence)
-1. User presses the unload key (DELETE) or closes the overlay window.
+1. User presses the exit key (DELETE), clicks Exit (Settings page), presses Alt+F4 on the menu or Ctrl+C in the console,
+   or closes the console; or CS2 closes. An error thrown inside the loop is caught and still runs steps 2-5.
 2. Restore everything we changed in the game: the triggerbot lets go of `attack` (also when the overlay hides); the
    aimbot's view angle writes simply stop. Nothing else is changed because there are no patches or hooks.
 3. Shut down ImGui and the DX11 overlay.
 4. Close the process handle.
-5. Exit.
+5. Exit. A shutdown the user asked for skips main's "Press Enter to exit" (`core::shutdown_requested`); errors and "cs2.exe
+   has closed" keep it, so a double-clicked console stays readable.
 
 **There is no trampoline, no in-flight counter, no `FreeLibraryAndExitThread`. External is dramatically simpler
 to shut down safely.**
@@ -825,6 +827,12 @@ Rules:
   warning. **Presets** (Settings → Presets, or keys in the Keybinds page's Presets category, unbound by default): Off /
   Chill / Medium / Rage switch the features and their strength, never keybinds, colours, team mode, team checks, max
   distances or positions; the result is an unsaved change.
+- **Phase 9 (done, verified in-game by the user 2026-10-07):** panic (END), the exit key (DELETE) and the final key layout were
+  already done in Phase 7. New: an **Exit** card on the Settings page ("Exit the tool"; with unsaved changes it asks
+  "Really exit? Unsaved changes are lost" first). Exiting on purpose (exit key, Exit button, Alt+F4) now closes the
+  console too instead of waiting for Enter. An error inside the overlay loop still lets go of attack and removes the
+  overlay. Panic also drops a preset or profile load clicked just before it. The console banner says "External Cheat
+  by BigH" (it still said "Phase 5"). Robustness review: see `docs/DEVLOG.md` (2026-10-07, Phase 9).
 
 ---
 
@@ -1289,12 +1297,15 @@ warnings and clamped values; `default` can't be overwritten; each preset switche
 keybinds and colours alone; tests pass.
 
 ### Phase 9: Panic, clean shutdown, polish
-- [ ] Panic: disables aimbot/ESP/triggerbot (so the angle writes stop), closes the menu
-- [ ] Exit action + Settings-page button: restore everything, shut down the overlay, close the handle, exit
-- [ ] Final key layout: **DELETE = exit, END = panic** (INSERT menu)
-- [ ] Robustness review: map change, death, alt-tab, minimise, game close, game restart
-- [ ] Builds with zero warnings (Debug + Release); tests pass
-- [ ] Verified in-game by the user
+- [x] Panic: disables aimbot/ESP/triggerbot (so the angle writes stop), closes the menu (done in Phase 7; now also
+      drops a preset / profile load queued just before)
+- [x] Exit action + Settings-page button: restore everything, shut down the overlay, close the handle, exit (key in
+      Phase 7; Exit card with an unsaved-changes confirmation; a deliberate exit no longer waits for Enter)
+- [x] Final key layout: **DELETE = exit, END = panic** (INSERT menu) (the defaults since Phase 7)
+- [x] Robustness review: map change, death, alt-tab, minimise, game close, game restart (code review, DEVLOG table;
+      fixed: errors in the loop now still release attack and remove the overlay)
+- [x] Builds with zero warnings (Debug + Release); tests 216/216; `--diag` 67/67
+- [x] Verified in-game by the user (2026-10-07): all good; approved
 
 **Acceptance:** panic returns the game to normal instantly; 10 start/stop cycles with no crash, leak, input or
 cursor problem; after exit the game behaves exactly like an untouched game.
@@ -1431,7 +1442,13 @@ against the map's collision geometry, read from the game files (not from game me
   and a hand-broken profile: warnings logged, values clamped, a refused menu key kept INSERT). **No offset changed.**
   Not checked here: the Settings page and its buttons on screen.
 
-**Next:** Phase 9, panic, clean shutdown, polish.
+- **Phase 9: done, verified in-game by the user (2026-10-07), approved, committed and pushed.** Most of it existed since Phase 7 (panic, exit
+  key, key layout). Added the Exit button, the no-"Press Enter" deliberate exit, the error guard around the loop, and
+  the panic/request fix; robustness reviewed in code. Debug + Release zero warnings, tests 216/216, `--diag` 67/67,
+  overlay start checked against the running game. **No offset changed.** Not checked here: anything that needs keys
+  or clicks in the game (exit key, Exit button, panic, 10 start/stop cycles, map change, game close).
+
+**Next:** Phase 10, UI redesign.
 
 ---
 
@@ -1638,6 +1655,12 @@ against the map's collision geometry, read from the game files (not from game me
   The profile shows on Home (not in the header: the user wanted the header to keep only the "External" pill).
 - **2026-10-07 (Phase 8):** The three fractional-alpha colour defaults became byte-exact (`Color::rgba`), so the
   defaults survive `#RRGGBBAA` unchanged; the visible difference is under 0.5 %.
+- **2026-10-07 (Phase 9):** Phase 9 was mostly done by Phase 7, so it became a **review, not a rewrite**: no new
+  modules. A shutdown the user asks for (exit key, Exit button, Alt+F4) sets `core::shutdown_requested`, so main()
+  skips "Press Enter"; "cs2.exe has closed" and errors keep the wait (the console should stay readable). The Exit
+  button asks for confirmation only when there are unsaved changes. When the game closes the tool **exits** rather
+  than waiting for a new cs2.exe (the handle, module bases and offsets belong to that process); restart the tool with
+  the game.
 - **2026-10-06 (Phase 3):** Weapons are named from the **item definition index** (table in `game/weapon.cpp`), not the
   designer name, because some weapons share a designer name (USP-S / P2000). Each also gets a `WeaponClass` for the
   Phase 5 triggerbot filter.

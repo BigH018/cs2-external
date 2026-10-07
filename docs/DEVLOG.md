@@ -536,3 +536,45 @@ thickness, keeps INSERT as the menu key (Mouse 1 refused) and names F8 as panic.
 **Not verified here:** the Settings page on screen and any button on it (no input was sent to the game).
 
 **User (2026-10-07):** everything works; approved for commit. Phase 8 done.
+
+## 2026-10-07: Phase 9, panic, clean shutdown, polish
+
+Most of Phase 9 had already been done in Phase 7: panic (END), the exit key (DELETE) and the final key layout. This
+session added what was missing and reviewed the robustness cases in code.
+
+**Built**
+- Settings page: an **Exit** card. "Exit the tool" exits straight away; with unsaved changes it first asks "Really
+  exit? Unsaved changes are lost" (with Cancel). It queues `AppState::requests.exit`; `app/frame` handles it at the
+  start of the next frame, the same way the exit key does.
+- A deliberate exit (exit key, Exit button, Alt+F4 on the menu) sets `core::shutdown_requested`, so the console closes
+  instead of waiting at "Press Enter to exit...". "cs2.exe has closed" and errors still wait, so a double-clicked
+  console stays readable.
+- `app/frame`: the loop moved into `loop()`, with `run()` catching any `std::exception`. The shutdown (release attack,
+  close the menu and give focus back, ImGui, overlay) now runs after an error too. Before this, an error unwound
+  straight to `main()`, and the triggerbot could leave attack pressed in the game.
+- Panic also drops a queued preset and a queued profile load. A preset clicked one frame before panic would
+  otherwise have turned the features back on in the same frame.
+- The console banner still said "CS2 External - Phase 5". It now reads "External Cheat by BigH (CS2, offline
+  only...)". The Home page's exit hint and the startup log mention the Exit button.
+
+**Robustness review** (code paths, not all exercised in-game)
+
+| Case | What happens |
+|---|---|
+| Death | The snapshot keeps the dead local player. The aimbot (`compute_aim`) and the triggerbot (`not_in_match`) skip while you're dead; the ESP and radar keep drawing; the spectator list switches to "Watching ...". |
+| Map change / loading screen | The local pawn reads 0 and the snapshot is empty or garbage-filtered (view matrix sanity check, pawn validity, handle serials), so nothing is drawn or aimed. Home shows "Not in a match". The game window stays the same. |
+| Alt+Tab | The overlay hides, the triggerbot lets go of attack, the menu closes without taking focus back, and the menu hotkey is unregistered. Toggle keys keep their state; hold keys read released. |
+| Minimise | Same as Alt+Tab (`IsIconic`). |
+| Game window recreated | `find_game_window` notices the dead HWND, closes the menu, and waits for the new window. |
+| Game closes | `is_running` fails, so the tool exits normally (overlay removed, handle closed) and the console waits for Enter. |
+| Game restart | The tool exits with the old game (above). Start it again after the new game is in the menu. Waiting for a new cs2.exe was not built (Decision log). |
+| Ctrl+C / console closed | Already in place: the handler sets the flag, the main thread shuts down, and closing the console waits up to 3 s. |
+| Error in a frame | New: caught in `run()`, logged, and the full shutdown still runs. |
+
+**Verified here:** Debug and Release zero warnings; tests 216/216 in both; `--diag` against the running game (build
+14189, in a match): all 67 checks OK, banner correct. The overlay started in the background (profile "goat" loaded,
+D3D11 + ImGui ready, game window found), then was force-closed (no input is ever sent to the user's game).
+**Not verified here:** the Exit button, the exit key without "Press Enter", panic, 10 start/stop cycles, a map change,
+the game closing.
+
+**User (2026-10-07):** all good; approved for commit. Phase 9 done.
