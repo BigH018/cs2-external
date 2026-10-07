@@ -113,8 +113,8 @@ fields of the 469 live client classes with the dump: 0 mismatches.
 | | `m_iMaxHealth` / `m_iHealth` | `0x348` / `0x34C` | ESP, aimbot, triggerbot |
 | | `m_lifeState` | `0x354` | alive check (0 = alive) |
 | | `m_iTeamNum` | `0x3E7` | team check (2 = T, 3 = CT; live: 2) |
-| | `m_fFlags` | `0x3F4` | bunny hop (bit 0 `FL_ONGROUND`), triggerbot "in air" |
-| | `m_vecVelocity` | `0x430` | bunny hop diagnostics |
+| | `m_fFlags` | `0x3F4` | triggerbot "in air" (bit 0 `FL_ONGROUND`) |
+| | `m_vecVelocity` | `0x430` | unused (was for bunny hop, dropped 2026-10-07) |
 | `CGameSceneNode` | `m_vecAbsOrigin` / `m_bDormant` | `0xC8` / `0x103` | position, dormant filter |
 | `CSkeletonInstance` | `m_modelState` | `0x140` | bones (Phase 4; the pawn's scene node is a CSkeletonInstance) |
 | `C_BaseModelEntity` | `m_vecViewOffset` | `0xF60` | eye position |
@@ -299,3 +299,31 @@ read-only.
 - **`m_iIDEntIndex`** (2026-10-07): view angles written to look at a bot's head (bone 7) → the local pawn's
   `m_iIDEntIndex` read **211**, that bot's pawn entity index (`m_hPlayerPawn & 0x7FFF`); 15° to the side → **-1**. The
   view was restored afterwards. So the triggerbot compares it with `PlayerSnapshot::pawn_index`.
+
+**Delay measured 2026-10-07 (build 14189, offline bot match):** the spotted bit is FOV-dependent (on at 45° off the
+view, off at 90°+), so it was switched by writing the view angles towards / 135° away from a teammate bot 150 units
+away, 60 times at random phase, while a tight read loop timestamped three things: the server pawn's eye angles taking
+the new view, the **server's** mask bit (server.dll copy) and the **client's** mask bit.
+
+| Stage | Median | Range |
+|---|---|---|
+| Input (our write → server has the view; irrelevant for a bot walking into view) | ~12 ms | 0-26 ms |
+| **Server compute** (server has the view → server bit changes) | **~250 ms** | 0-490 ms |
+| Replication + interpolation (server bit → client bit) | ~1-2 ms | 0-3 ms |
+
+The server re-evaluates spotting about every **0.5 s** (uniform 0-500 ms wait); the copy to the client costs ~1 ms in
+a local game. So reading the server's copy (option 2) would save ~1 ms and was **not built**. 2 of the 60 view writes
+didn't take (no stage moved), matching the one lost restore earlier: single writes can be dropped, the aimbot's
+per-frame rewrite covers it.
+
+## server.dll (found 2026-10-07; **not used by the code**)
+
+In an offline match the server runs inside cs2.exe (`server.dll`, 37 MiB). Found while measuring the spotted delay:
+- **Entity system:** the client's `dwEntityList` signature (`48 89 0D ? ? ? ? E9 ? ? ? ? CC`) has exactly one hit in
+  server.dll's `.text` → global at `server.dll + 0x232D948` → the server's entity system, same chunked layout (entity 1
+  = `cs_player_controller`; server pawns' designer name is `player`).
+- **Mapping:** client and server entities share indices (controllers 1..64, pawns at the same index). Server handles
+  carry 7 more serial bits (client `0x004B00CD`, server `0x2A4B00CD`): compare the low 25 bits.
+- Server schema (`server_dll.json` from the user's dumper run): `CCSPlayerPawn::m_entitySpottedState` `0x14B0`,
+  `m_angEyeAngles` `0x15C0`, `CBaseEntity::m_iHealth` `0x2D0`, `m_iTeamNum` `0x344`, `CCSPlayerController::m_hPlayerPawn`
+  `0x8EC`. Health, team and spotted masks read identical to the client's for all 20 players.

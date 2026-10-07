@@ -291,3 +291,24 @@ inside the head. The head circle (now radius 6.5), head aim and the triggerbot's
 **Not verified (needs the user in-game):** the aimbot and triggerbot running inside the overlay (aiming, smoothing
 feel, FOV circle size, every triggerbot option), the pages' layout.
 **User check (2026-10-07):** aimbot, triggerbot and the fixed head circle all good in-game; approved for commit.
+
+## 2026-10-07: spotted-by delay measured (no code change)
+
+The user asked whether visibility could be faster and wanted the delay split into server compute vs replication +
+interpolation, with option 2 (read the server's mask from server.dll) only if replication was the bulk.
+
+- Found the server entity system (the client's entity-list signature hits once in server.dll) and the client →
+  server mapping (same indices; server handles have 7 extra serial bits). Details in `docs/offsets.md`.
+- The spotted bit depends on where you look (on at 45° off, off at 90°+), so the measurement could be driven by
+  view-angle writes alone (the user ran up to a bot once; then hands off).
+- 60 transitions: server compute median ~250 ms (0-490: a ~0.5 s re-check), replication ~1-2 ms, input ~12 ms.
+- **Result: replication is ~1 % of the delay, so option 2 was not built** (as the user decided in advance). Option 3
+  (own ray cast) is deferred: the user wants to come back to it later (CLAUDE.md roadmap, "Later").
+- Also seen: 2 of 60 single view-angle writes were dropped by the game.
+
+## 2026-10-07: bunny hop dropped
+
+User decision: bunny hop is out (advised it's an internal-style feature that feels bad externally). Removed from the
+plan (CLAUDE.md §3, Phase 6), the Misc page placeholder, `features::ActiveFeatures` and the watermark names (test
+updated). The proven `jump` button format stays in `docs/offsets.md`. Also checked: server.dll has no console variable
+for the spotting re-check interval (`CCSEntitySpotting` is a built-in game system), so the ~0.5 s can't be tuned.

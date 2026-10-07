@@ -124,12 +124,13 @@ implementation:
   hold while on target; delay between shots; team check; visible only; max distance; weapon-class filter (pistol,
   SMG, rifle, sniper, shotgun, heavy); snipers only when scoped; don't fire while flashed or in the air; head only
   (after bones are found).
-- **Bunny hop** (Misc): hold space and the tool times each jump to the moment you land.
+- ~~Bunny hop~~: **dropped** by the user (2026-10-07): judged not worth it externally (timing from outside the game
+  feels bad). No bunny hop page, no jump writes.
 - **Watermark** on the game: the logo, "External Cheat by BigH", and under it the features that are on, one per
   line. No menu-key hint.
 - ~~Player values (health / armour / ammo writes)~~: **dropped** by the user (2026-10-06). No Player page, no
   player-value writes.
-- **Radar / misc** (with bunny hop, Phase 6): enlarged radar, enemy dots on radar, bomb timer, spectator list,
+- **Radar / misc** (Phase 6): enlarged radar, enemy dots on radar, bomb timer, spectator list,
   hitsound (via the overlay's own audio, not the game's).
 - **Keybinds** for every action, **profiles** saved as JSON, **panic key**, clean shutdown.
 - **Presets** (Off / Chill / Medium / Rage) that switch features and strengths.
@@ -149,7 +150,7 @@ implementation:
 
 | Feature | External? | How (fields from build 14189's dump, re-verified in Phase 2) |
 |---|---|---|
-| Bunny hop | Yes | Each frame while space is held: read the local pawn's `m_fFlags` (`C_BaseEntity` `0x3F4`, bit 0 = `FL_ONGROUND`). On landing, press jump by writing the `jump` button state (`buttons.json`, client.dll `+0x22324E0`); fallback `SendInput`. Needs a write handle. Timing depends on our loop rate vs the 64-tick server: a vsync-limited loop can miss hops, so Phase 6 may need a faster polling path |
+| ~~Bunny hop~~ (dropped 2026-10-07) | Yes | Each frame while space is held: read the local pawn's `m_fFlags` (`C_BaseEntity` `0x3F4`, bit 0 = `FL_ONGROUND`). On landing, press jump by writing the `jump` button state (`buttons.json`, client.dll `+0x22324E0`); fallback `SendInput`. Needs a write handle. Timing depends on our loop rate vs the 64-tick server: a vsync-limited loop can miss hops, so Phase 6 may need a faster polling path |
 | ESP: scoped indicator | Yes | One byte per bot: `C_CSPlayerPawn::m_bIsScoped` (`0x1EA0`); the weapon name (Phase 3) says which gun |
 | Visibility check (aimbot, ESP, triggerbot) | **Heuristic only** | Exact line of sight = the game's trace = internal. External: `C_CSPlayerPawn::m_entitySpottedState` (`0x1E88`) → `EntitySpottedState_t::m_bSpottedByMask` (`+0xC`), a bit per player slot that the game itself sets when that player has line of sight (it feeds the radar). In an offline match our own client runs the server, so it's kept up to date, but it lags a little and is a "spotted" flag, not a per-frame ray |
 | Triggerbot (configurable) | Yes | Crosshair target: local `C_CSPlayerPawn::m_iIDEntIndex` (`0x36CC`, the entity under the crosshair). Fire by writing the `attack` button state (`buttons.json` `+0x2231FD0`) or `SendInput`. Flash: `C_CSPlayerPawnBase::m_flFlashDuration` (`0x1510`). Air: `m_fFlags`. Scoped: local `m_bIsScoped`. Head only needs the bone array (§7) |
@@ -552,15 +553,15 @@ You may change an offset **only if** you:
 | Name | Where | Dump value | Used by |
 |---|---|---|---|
 | `m_iHealth` | `C_BaseEntity` | `0x34C` | ESP, aimbot, triggerbot |
-| `m_fFlags` | `C_BaseEntity` | `0x3F4` | bunny hop (on ground), triggerbot (in air) |
-| `m_vecVelocity` | `C_BaseEntity` | `0x430` | bunny hop diagnostics |
+| `m_fFlags` | `C_BaseEntity` | `0x3F4` | triggerbot (in air) |
+| `m_vecVelocity` | `C_BaseEntity` | `0x430` | (unused since bunny hop was dropped) |
 | `m_bIsScoped` | `C_CSPlayerPawn` | `0x1EA0` | ESP scoped indicator, triggerbot "only when scoped" |
 | `m_entitySpottedState` | `C_CSPlayerPawn` | `0x1E88` | visibility heuristic |
 | `m_bSpottedByMask` | `EntitySpottedState_t` | `+0xC` | visibility heuristic (bit per player slot) |
 | `m_iIDEntIndex` | `C_CSPlayerPawn` | `0x36CC` | triggerbot (entity under the crosshair) |
 | `m_iShotsFired` | `C_CSPlayerPawn` | `0x1EB4` | triggerbot burst counting |
 | `m_flFlashDuration` | `C_CSPlayerPawnBase` | `0x1510` | triggerbot "don't fire while flashed" |
-| `jump` | `buttons.json`, client.dll | `0x22324E0` | bunny hop |
+| `jump` | `buttons.json`, client.dll | `0x22324E0` | (unused since bunny hop was dropped; format proven) |
 | `attack` | `buttons.json`, client.dll | `0x2231FD0` | triggerbot |
 
 Writing a button global is a game write: it needs `PROCESS_VM_WRITE | PROCESS_VM_OPERATION`, added in Phase 5 (with
@@ -821,6 +822,9 @@ Rules:
 - **Bone 6 is the head joint, not the head.** It sits at the base of the skull, level with the jaw (~4 units below
   the eyes). The middle of the head is bone 7 (eye height, 4.6 units forward). Aim, head circle and head-only use
   `kHeadCentre` (7); checked on a screenshot.
+- **The spotted-by bit lags because the server re-checks it only every ~0.5 s** (measured 2026-10-07: server compute
+  median ~250 ms, replication to the client ~1-2 ms). It is also FOV-dependent (off when the target is 90°+ off your
+  view). Reading the server's copy in server.dll would not help; only an own ray cast (option 3, deferred: see the roadmap) would.
 - **The triggerbot must only write attack on a change.** Writing "released" every frame would swallow the user's own
   clicks; `app/frame` also skips a release while Mouse 1 is physically down.
 - **Projection: reject w < 0.01, not w < 0.** A point near the camera plane divides by almost nothing. A transposed
@@ -1080,20 +1084,17 @@ the menu is open or the game isn't focused; tests pass.
 **Honest note:** external aimbot cannot write angles on the game's logic thread, so the view will feel slightly
 laggier than an internal one. That's the cost of external. It's still usable for offline learning.
 
-### Phase 6: Misc: bunny hop, radar, bomb timer, spectators, hitsound
-(Replaces the dropped "Player values" phase: no Player page, no health / armour / ammo writes, no Set / Freeze.)
-- [ ] `features/bunny_hop` (pure, tested): space held + on ground → press jump; in air → release. Diagnostic first
-      (in-game): the right value format for the `jump` button write, and whether the loop rate catches every landing
-      (if not: a faster polling path for this one check, decided with the user)
-- [ ] Misc page: bunny hop on/off + its key (space by default), radar, bomb timer, spectator list, hitsound
+### Phase 6: Misc: radar, bomb timer, spectators, hitsound
+(Replaces the dropped "Player values" phase: no Player page, no health / armour / ammo writes, no Set / Freeze.
+Bunny hop was dropped from this phase by the user on 2026-10-07.)
+- [ ] Misc page: radar, bomb timer, spectator list, hitsound
 - [ ] Radar, bomb timer (`dwPlantedC4`), spectator list (observer handles), hitsound (overlay audio): one at a time,
       each with its own in-game check
 - [ ] Builds with zero warnings (Debug + Release); tests pass
 - [ ] Verified in-game by the user
 
-**Acceptance:** holding space chains hops on flat ground without a manual re-press; releasing space stops it
-immediately; nothing jumps while the menu is open or the game isn't focused; each misc feature does what its label
-says; tests pass.
+**Acceptance:** each misc feature does what its label says; nothing changes in the game while the menu is open or
+the game isn't focused; tests pass.
 
 ### Phase 7: Keybind engine
 - [ ] `input/keys`, `input/actions` (registry + defaults), `input/keybinds` (HOLD/TOGGLE/PRESS), tested
@@ -1158,6 +1159,19 @@ cursor problem; after exit the game behaves exactly like an untouched game.
 **Acceptance:** someone who has never seen the project can understand what it does, how each technique works and
 why, build it and use it, from the README alone.
 
+### Later (the user wants to come back to it): exact visibility, own ray cast (option 3)
+Deferred 2026-10-07. The game's spotted bit lags 0-0.5 s (the server re-checks every ~0.5 s; measured, see
+`docs/offsets.md` "Spotted-by mask"), and nothing faster reaches the client. Fully external fix: trace our own rays
+against the map's collision geometry, read from the game files (not from game memory).
+- [ ] Research: where the map's collision / physics data lives in the VPK and its format (Source 2 resource files);
+      decide parse-at-startup vs cache
+- [ ] Load the current map's collision triangles; build a BVH (pure, tested)
+- [ ] `is_visible(eye, point)`: ray vs BVH; test eye → head / chest / pelvis per bot every frame within a budget
+- [ ] Replace or combine with the spotted bit for ESP colours, aimbot and triggerbot visible-only; `--diag` check
+- [ ] Known limits: doors, props and smokes that move or appear aren't in the static map
+- Cheaper partial idea noted on the way (not chosen): server-side bot vision (`CCSBot::m_isEnemyVisible` in
+  server.dll): an enemy bot that sees you is visible to you; faster only when it faces you. Measure its update rate first.
+
 ### Phase 12+ (only if the user decides to): Internal
 - [ ] This is a **separate, explicitly-scoped decision**, not a silent slide. If the user wants silent aim, no
       spread, no recoil, or sub-tick angle writes, that requires a DLL, injection, and hooks. Re-read §1, re-scope
@@ -1220,8 +1234,15 @@ why, build it and use it, from the README alone.
   view-angle writes stick, bone 7 = middle of the head. **No offset changed** (two schema fields added from the dump).
   The user checked aimbot, triggerbot and the head circle in-game: all good.
 
-**Next:** Phase 6 (misc: bunny hop first). The user asked about faster visibility checks first (see DEVLOG
-2026-10-07).
+- **Spotted-by delay measured (2026-10-07):** ~0.5 s server re-check is the whole delay; replication ~1-2 ms. Option 2
+  (server.dll mask) therefore not built; option 3 deferred by the user (roadmap: "Later"). server.dll entity list + mapping documented in
+  `docs/offsets.md` (unused).
+
+- **Bunny hop dropped (2026-10-07, user decision):** removed from the plan, the Misc page and `ActiveFeatures`.
+
+- **Option 3 (own ray cast visibility) deferred** to a "Later" roadmap section, to come back to after the main phases.
+
+**Next:** Phase 6 (misc: radar, bomb timer, spectator list, hitsound; one at a time), in a new session.
 
 ---
 
@@ -1372,6 +1393,12 @@ why, build it and use it, from the README alone.
   Mouse 4 (hold).
 - **2026-10-07 (Phase 5):** Only the overlay opens a **read-write** handle; `--diag` and `--live` stay read-only.
 - **2026-10-07:** **Autonomous mode switched OFF** by the user (back at the PC).
+- **2026-10-07:** **No server-side spotted read (option 2).** The user's condition was "only if replication +
+  interpolation is the bulk"; measured, it is ~1-2 ms of a ~250 ms median (the server's ~0.5 s re-check is the rest).
+  Option 3 (own ray cast) **deferred** by the user: "do it later and come back to it" (roadmap: "Later").
+- **2026-10-07 (user decision):** **Bunny hop dropped.** The user was advised it's a poor fit for external (jump timing
+  from outside the game feels bad). Removed from §3, the Phase 6 plan, the Misc page placeholder and
+  `features::ActiveFeatures`. The `jump` button format stays documented (proven) in case it's ever wanted.
 - **2026-10-06 (Phase 3):** Weapons are named from the **item definition index** (table in `game/weapon.cpp`), not the
   designer name, because some weapons share a designer name (USP-S / P2000). Each also gets a `WeaponClass` for the
   Phase 5 triggerbot filter.
