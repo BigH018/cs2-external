@@ -64,7 +64,7 @@ build or test passed when it wasn't run.
 
 ### 2a. Autonomous mode (the user switches it on and off)
 
-**Current setting: ON** (switched on 2026-10-06, night, after Phase 2; the user is asleep).
+**Current setting: OFF** (switched off 2026-10-07 by the user, mid-Phase 5; it had been on since 2026-10-06 night).
 
 The user switches it with **"autonomous mode on"** / **"autonomous mode off"**. Whoever is told that updates the
 "Current setting" line above (and, when switching on, the standing decisions below if the user gives new ones).
@@ -305,7 +305,8 @@ cs2-external/
         schema_system.h/.cpp      ✅ PURE: find_type_scope (SchemaSystem_001), index_classes (self-pointing class
                                      infos in a client.dll copy), read_class (live fields)
         signatures.h/.cpp         ✅ PURE: resolve_signature over a module copy (several hits must agree)
-        snapshot.h                ✅ PURE data: Team, PlayerSnapshot (controller + pawn copy, eye_position, on_ground),
+        snapshot.h                ✅ PURE data: Team, PlayerSnapshot (controller + pawn copy, pawn_index, eye_position,
+                                     head_position, on_ground), LocalState (crosshair entity, flash, view angles),
                                      GameSnapshot (globals, view matrix if sane, players, local())
         player.h/.cpp             ✅ read_local_pawn; read_player (controller → pawn, validity checks: garbage pawn
                                      dropped); read_game (entity system, globals, view, every controller)
@@ -316,34 +317,39 @@ cs2-external/
         bones.h/.cpp              ✅ read_bones: scene node + m_modelState + 0x80 → 23 bone positions in one read,
                                      garbage rejected (non-finite, > 200 units from the feet)
         visibility.h/.cpp         ✅ player_slot, is_spotted_by (bit per slot), read_spotted_by_mask
+        writes.h/.cpp             ✅ the only game writes: set_button (65537 / 256), read/write_view_angles
         weapon.h/.cpp             ✅ read_active_weapon_id (pawn → services → handle → 0x149A), weapon_info (id →
                                      name + WeaponClass), weapon_class_name
         globals.h/.cpp            ✅ read_globals (one read: realtime, framecount, maxClients, interval, curtime,
                                      tickcount, map name), is_sane
       maths/                      (PURE)
         vec.h                     ✅ Vec2, Vec3 (ops, dot, length, distance, is_finite), units_to_metres
-        angles.h/.cpp             🔲 [5] Angles, normalize, calc_aim_angles, angular_distance, smoothing
+        angles.h/.cpp             ✅ Angles, normalize, calc_aim_angles, angular_distance, smoothing_fraction,
+                                     step_towards, forward, distance_to_ray
         projection.h/.cpp         ✅ ViewMatrix (row-major 4x4, at, is_sane), world_to_screen (w < 0.01 rejected)
-        skeleton.h/.cpp           ✅ bone indices (proven live), kSkeletonLinks (17), project_skeleton
+        skeleton.h/.cpp           ✅ bone indices (proven live; kHeadCentre = 7 is "the head"), kSkeletonLinks (17),
+                                     project_skeleton
       features/                   (PURE: data in, decisions out)
         esp.h/.cpp                ✅ player_box, health_colour, is_enemy, display_name, distance_text, build_esp →
                                      primitives (boxes/corners, outline, head circle, skeleton, health bar/number,
                                      name, weapon, distance, SCOPED, snaplines, visible/hidden colours)
-        aimbot.h/.cpp             🔲 [5] aim_point, find_candidates, select_target, compute_aim
-        triggerbot.h/.cpp         🔲 [5] Triggerbot state machine
+        targeting.h/.cpp          ✅ is_enemy, is_live_target, is_visible_to, distance_metres, within_distance (shared)
+        aimbot.h/.cpp             ✅ aim_point, find_candidates, select_target, compute_aim, fov_circle
+        triggerbot.h/.cpp         ✅ trigger_target, trigger_block (reasons), Triggerbot state machine
+        activation.h              ✅ KeyActivation: hold / toggle from a polled key (until Phase 7)
         feature_summary.h/.cpp    ✅ ActiveFeatures + feature_summary() → "ESP · Aimbot" for the watermark
       render/
         primitives.h              ✅ Line, Rect, FilledRect, Circle, Text (+ TextAnchor), Primitive variant (PURE)
         painter.h/.cpp            ✅ paint(draw list, primitives, font, size): ImGui, text with a shadow
       input/
-        keys.h/.cpp               🔲 [7] VK ↔ names, KeySet
+        keys.h                    ✅ kBindableKeys (the keys Phase 5 features can use), key_name, key_index
+        keys.cpp                  🔲 [7] every VK ↔ name, KeySet
         actions.h/.cpp            🔲 [7] ActionId registry
         keybinds.h/.cpp           🔲 [7] HOLD/TOGGLE/PRESS engine
         key_poll.h/.cpp           🔲 [7] GetAsyncKeyState polling
         bind_capture.h/.cpp       🔲 [7] bind capture
       settings/
-        settings.h                ✅ Settings { overlay, esp } (TeamMode, BoxStyle, SnaplineOrigin, EspColours);
-                                     [5] aimbot/triggerbot
+        settings.h                ✅ Settings { overlay, general (team mode), esp, aimbot, triggerbot } + enums
         profile_json.h/.cpp       🔲 [8]
         profile_store.h/.cpp      🔲 [8]
         presets.h/.cpp            🔲 [8]
@@ -359,18 +365,19 @@ cs2-external/
         menu.h/.cpp               ✅ header (logo, title, pills) + grouped sidebar + current page
         hud.h/.cpp                ✅ watermark (logo + active features) + frame outline, background draw list
         pages/                    ✅ pages.h + one file per page: home (logo, live status, map/players/you), esp (every
-                                     ESP option, colour pickers), settings (overlay switches), aimbot, triggerbot,
-                                     misc (placeholders)
+                                     ESP option, colour pickers), aimbot and triggerbot (every option + live status),
+                                     settings (overlay switches), misc (placeholder); controls.h/.cpp: shared check,
+                                     colour, combo, key_combo, team_mode_combo, max_distance_slider
       color.h                     ✅ Color (RGBA floats): rgb(0xRRGGBB), faded, lerp
       config.h                    ✅ PURE: branding, pointer bounds, page size, process/module names, --diag flag and
                                      scan limits, menu key, menu sizes, timings; [5+] Range<T> + every setting range
       app/                        (the orchestrator, from AC: the only place that wires everything together)
         diagnostics.h/.cpp        ✅ the startup offset diagnostic: build, interfaces, signatures, schema, buttons/
                                      globals → console + OffsetReport for the Home page
-        frame.h/.cpp              ✅ app::run: the loop (pump → game window/focus → menu key → status read → draw →
-                                     present) and the overlay's teardown
-        state.h                   ✅ AppState (game info, offset report, settings, active features, menu open,
-                                     match status, game snapshot, overlay size/FPS)
+        frame.h/.cpp              ✅ app::run: the loop (pump → game window/focus → menu key → snapshot → aimbot
+                                     write → triggerbot attack write → draw → present) and the overlay's teardown
+        state.h                   ✅ AppState (game info, offset report, settings, active features, aim/trigger
+                                     status, menu open, match status, game snapshot, overlay size/FPS)
         live_view.h/.cpp          ✅ `--live`: console table (~4 Hz) of globals, view matrix, every player, read time;
                                      redraws in place in a console, plain frames when redirected
   tests/
@@ -396,17 +403,19 @@ cs2-external/
     game/test_signatures.cpp      ✅ one hit, agreeing/disagreeing hits, add, section bounds, bad pattern
     game/test_offsets.cpp         ✅ table sanity: signatures parse + wildcard their disp32, no duplicates, derived
                                      values (pawn = prediction + 0xF8, weapon chain = 0x149A)
-    maths/test_angles.cpp         🔲 [5]
+    maths/test_angles.cpp         ✅ wrap/clamp, aim angles vs forward, short-way deltas, smoothing at any frame rate
     maths/test_projection.cpp     ✅ synthetic camera (centre, right, up, behind) + the live matrix (crosshair, a bot's
                                      feet, transpose is wrong)
     maths/test_skeleton.cpp       ✅ links valid, projection with ends behind the camera
     game/test_bones.cpp           ✅ read_bones layout, garbage rejected
     game/test_visibility.cpp      ✅ slot bits across both halves, read_spotted_by_mask
     features/test_esp.cpp         ✅ box geometry, health colour, team modes, skips, visibility colours, labels, styles
-    features/test_aimbot.cpp      🔲 [5]
-    features/test_triggerbot.cpp  🔲 [5]
+    features/test_aimbot.cpp      ✅ targeting, aim points (bone 7), candidates/filters, priorities, smoothing, FOV circle
+    features/test_triggerbot.cpp  ✅ target filters, block reasons, state machine timings (single/burst/hold), activation
+    game/test_writes.cpp          ✅ button values, view angle read/normalized write (FakeMemory)
+    helpers/fake_game.h           ✅ hand-built snapshots (you at the origin looking along +x)
     features/test_feature_summary.cpp ✅ the watermark's feature line (empty, one, order, all)
-    settings/test_settings.cpp    ✅ defaults inside their ranges, config::Range
+    settings/test_settings.cpp    ✅ defaults inside their ranges (ESP, aimbot, triggerbot), bindable keys, config::Range
     settings/test_profile_json.cpp 🔲 [8]
     settings/test_profile_store.cpp 🔲 [8]
     settings/test_presets.cpp     🔲 [8]
@@ -466,9 +475,8 @@ main loop (60+ Hz, or vsync-limited):
 
 ### 6.4 Shutdown (no unload sequence)
 1. User presses the unload key (DELETE) or closes the overlay window.
-2. Restore everything we changed in the game (the only write is the aimbot's view angles, which simply stop; nothing
-   else is changed
-   because there are no patches or hooks).
+2. Restore everything we changed in the game: the triggerbot lets go of `attack` (also when the overlay hides); the
+   aimbot's view angle writes simply stop. Nothing else is changed because there are no patches or hooks.
 3. Shut down ImGui and the DX11 overlay.
 4. Close the process handle.
 5. Exit.
@@ -562,7 +570,8 @@ the aimbot's angle writes). The exact value format of a button write is verified
 1. **The bone array pointer.** Not in the schema. **Found in Phase 4** (build 14189, `offsets::layout::kModelStateBones`,
    `game/bones`, proof in `docs/offsets.md` "Bones"): pawn → `m_pGameSceneNode` (a `CSkeletonInstance`) +
    `m_modelState` (`0x140`, schema) + **`0x80`** → array of 32-byte bones (position, scale, rotation). Joint indices
-   (`maths/skeleton.h`) are **not** the commonly published ones: head 6, neck 5, spine 4/3/2, pelvis 1, arms 9-11 and
+   (`maths/skeleton.h`) are **not** the commonly published ones: head joint 6 (the jaw; **"the head" is bone 7**, the
+   middle of the head, proven 2026-10-07), neck 5, spine 4/3/2, pelvis 1, arms 9-11 and
    13-15, legs 17-19 and 20-22. `--diag` checks the head bone height on every alive player. How it was originally
    meant to be found (kept for the next time it moves):
    - **Cheat Engine:** get a pawn, follow `pawn + m_pGameSceneNode`, walk forward into the model state, look for a
@@ -703,7 +712,20 @@ Rules:
   teammates too in team colours) or Free for all. Colours: enemy/team × visible/hidden, from the spotted-by mask
   (visible = your slot's bit is set), each with opacity; thickness slider. Everything applies live. While the ESP is
   on, the game snapshot is read every frame (~0.4 ms). The watermark lists "ESP". `--diag` also checks CGlobalVars
-  and the bones on live players (48 checks in a match).
+  and the bones on live players (48 checks in a match). User check (2026-10-07): everything works; the head circle
+  sat on the neck, fixed in Phase 5 (bone 7, radius 6.5).
+- **Phase 5 (done, verified in-game by the user 2026-10-07):** **Aimbot** (menu → Aimbot → Enabled; off by default): while
+  the aim key is held (Mouse 1 by default; hold or toggle; key from a short list until Phase 7) it turns the view
+  towards the best bot inside the FOV (priority crosshair / distance / lowest health; aim at head = bone 7, body =
+  chest, or the nearest of five bones), with framerate-independent smoothing (1 = snap), team check, max distance,
+  visible only (spotted-by), and an FOV circle. It writes `dwViewAngles` every frame it has a target. **Triggerbot**
+  (menu → Triggerbot → Enabled): fires while a valid enemy is under the crosshair (`m_iIDEntIndex`): activation always /
+  hold / toggle, reaction delay, single tap / burst N / hold, delay between shots, team check, visible only, head only,
+  max distance, weapon classes, snipers only scoped, not while flashed, not in the air; a live status line says why
+  it isn't firing. It writes the `attack` button (65537 / 256) only on a change, never releases while you hold Mouse 1
+  yourself, and lets go when the menu opens, the game loses focus or the tool exits. Neither acts while the menu is
+  open or the game isn't in front. Team mode is shared by every feature. The overlay's handle is now read-write;
+  `--diag` / `--live` stay read-only. `--diag`: 50 checks.
 
 ---
 
@@ -796,6 +818,11 @@ Rules:
 - **The bone indices aren't the published ones.** Public CS2 code uses legs 22-27; in build 14189 bone 27 is a look-at
   point 1000 units in front of the face, and the legs are 17-22. Indices were mapped from live positions in each
   bot's own frame (`maths/skeleton.h`). If skeletons look scrambled after an update, re-map them the same way.
+- **Bone 6 is the head joint, not the head.** It sits at the base of the skull, level with the jaw (~4 units below
+  the eyes). The middle of the head is bone 7 (eye height, 4.6 units forward). Aim, head circle and head-only use
+  `kHeadCentre` (7); checked on a screenshot.
+- **The triggerbot must only write attack on a change.** Writing "released" every frame would swallow the user's own
+  clicks; `app/frame` also skips a release while Mouse 1 is physically down.
 - **Projection: reject w < 0.01, not w < 0.** A point near the camera plane divides by almost nothing. A transposed
   (column-major) read of the matrix doesn't fail loudly: points collapse towards the centre (unit test guards it).
 - **Screenshots work for checking the overlay.** `PIL.ImageGrab.grab()` captures the game and the layered overlay
@@ -1017,7 +1044,8 @@ matrix is sane before and during a frame.
       enemy/team hidden colours right; the watermark lists "ESP"; the ESP page renders. **Not exercised in-game:**
       a bot in line of sight (no bot was visible from the player's spot, every spotted mask read 0, so the
       "visible" colour and the slot bit are unverified), a scoped bot (bots had pistols), moving bots, dead bots,
-      other resolutions, a map change
+      other resolutions, a map change. **User check 2026-10-07:** all fine except the head circle (on the neck);
+      fixed in Phase 5 (bone 7). The visible colour was proven live 2026-10-07 (spotted bit = our slot)
 
 **Acceptance:** boxes line up with bots at near/far distance and different resolutions; nothing drawn for bots
 behind you; skeleton faces the right way (if bones are done); colours/opacity change live; dead bots not drawn;
@@ -1026,21 +1054,22 @@ hidden colours follow line of sight (with the heuristic's small lag); tests pass
 centre test).
 
 ### Phase 5: Aimbot + triggerbot
-- [ ] `maths/angles`: `Angles`, `normalize`, `clamp`, `calc_aim_angles`, `angular_distance`, `is_within_fov`,
-      `smoothing_fraction`, `step_towards`; tests
-- [ ] `features/aimbot`: candidates (FOV, dead, team, max distance), priority (crosshair / distance / lowest
+- [x] `maths/angles`: `Angles`, `normalize`, `clamp`, `calc_aim_angles`, `angular_distance`, `is_within_fov`,
+      `smoothing_fraction`, `step_towards` (+ `forward`, `distance_to_ray`); tests
+- [x] `features/aimbot`: candidates (FOV, dead, team, max distance), priority (crosshair / distance / lowest
       health), head/body/nearest-bone, compute aim; tests
-- [ ] `features/triggerbot`: state machine (idle → target acquired → reaction delay → firing → between shots),
-      fire modes single / burst / hold, filters (team, visible, distance, weapon class, scoped, flashed, in air);
+- [x] `features/triggerbot`: state machine (idle → reaction delay → tap → between shots → cooldown; hold), fire
+      modes single / burst / hold, filters (team, visible, distance, weapon class, scoped, flashed, in air, head);
       tests for every option
-- [ ] Write handle (`PROCESS_VM_WRITE | PROCESS_VM_OPERATION`); angle write via `WriteProcessMemory` on the main
-      thread; triggerbot fires via the `attack` button (or `SendInput`, decided with an in-game test); nothing fires
-      or aims while the menu is open or the game isn't focused
-- [ ] Visible-only option for the aimbot (spotted-by heuristic)
-- [ ] Aimbot page + Triggerbot page: enable, activation key (hold/toggle), aim point, priority, FOV radius +
-      circle, smoothing, team check, max distance, visible only; triggerbot: every option in §3
-- [ ] Builds with zero warnings (Debug + Release); tests pass
-- [ ] Verified in-game by the user
+- [x] Write handle (`core::kReadWriteAccess`, overlay mode only); angle write via `game/writes` on the main thread;
+      triggerbot fires via the `attack` button (65537 / 256, proven live; no `SendInput`); nothing fires or aims
+      while the menu is open or the game isn't focused
+- [x] Visible-only option for the aimbot (spotted-by heuristic, bit proven live 2026-10-07)
+- [x] Aimbot page + Triggerbot page: enable, activation key (hold/toggle), aim point, priority, FOV radius +
+      circle, smoothing, team check, max distance, visible only; triggerbot: every option in §3 (+ live status)
+- [x] ESP head circle fixed (user report): centred on bone 7, radius 6.5
+- [x] Builds with zero warnings (Debug + Release); tests 125/125 in both; `--diag` all 50 checks OK
+- [x] Verified in-game by the user (2026-10-07): aimbot, triggerbot and the fixed head circle all good; approved
 
 **Acceptance:** holding the aim key locks on the right target for each priority; head/body/nearest-bone works;
 smoothing feels consistent at different framerates; FOV circle matches which bots are eligible; team check and
@@ -1182,8 +1211,17 @@ why, build it and use it, from the README alone.
   (`CSkeletonInstance::m_modelState`, from the dump). **To check when awake:** the visible colour with a bot in plain
   view (unverified: no bot was in line of sight), "SCOPED" on a sniper bot, a map change.
 
-**Next:** Phase 5 (aimbot + triggerbot): write handle, angle writes, `attack` button format (live write tests allowed
-by §2a).
+- **User back (2026-10-07):** Phases 3-4 checked in-game by the user: all fine except the head circle (fixed in
+  Phase 5). **Autonomous mode switched OFF.**
+
+- **Phase 5: done, verified in-game by the user (2026-10-07), approved, committed and pushed.** The previous session
+  hit its context limit mid-phase (no HANDOFF.md); this one finished it from the uncommitted tree. Debug + Release
+  zero warnings, tests 125/125, `--diag` 50/50. Proven live here: the spotted-by bit, `m_iIDEntIndex` = pawn index,
+  view-angle writes stick, bone 7 = middle of the head. **No offset changed** (two schema fields added from the dump).
+  The user checked aimbot, triggerbot and the head circle in-game: all good.
+
+**Next:** Phase 6 (misc: bunny hop first). The user asked about faster visibility checks first (see DEVLOG
+2026-10-07).
 
 ---
 
@@ -1321,6 +1359,19 @@ by §2a).
 - **2026-10-06 (Phase 4):** "Team mode" means **Teams vs Free for all** (CS2 deathmatch is free-for-all), plus "Show
   teammates" in Teams mode. Primitives are plain data (`render/primitives.h`), so the whole ESP decision is
   unit-tested; only `render/painter` touches ImGui.
+- **2026-10-07 (Phase 5):** **"The head" is bone 7**, not bone 6 (the jaw), after the user's report and a screenshot
+  check. Head circle radius 5 → 6.5. Not an offset change (§7's rule doesn't apply): only which proven bone is used.
+- **2026-10-07 (Phase 5):** **Team mode moved to `settings::GeneralSettings`**, shared by ESP, aimbot and triggerbot
+  (shown on each page). Shared target checks live in `features/targeting`.
+- **2026-10-07 (Phase 5):** The triggerbot fires through the **`attack` button write**, not `SendInput` (proven live).
+  Taps are 30 ms; writes only on a change; release skipped while the user holds Mouse 1. Flashed =
+  `m_flFlashOverlayAlpha` > half of `m_flFlashMaxAlpha` (instead of `m_flFlashDuration`, which doesn't say how much of
+  the flash is left).
+- **2026-10-07 (Phase 5):** Keys are polled with `GetAsyncKeyState` in `app/frame` and picked from
+  `input::kBindableKeys` (16 keys) until Phase 7's keybind engine. Aimbot default key Mouse 1 (hold), triggerbot
+  Mouse 4 (hold).
+- **2026-10-07 (Phase 5):** Only the overlay opens a **read-write** handle; `--diag` and `--live` stay read-only.
+- **2026-10-07:** **Autonomous mode switched OFF** by the user (back at the PC).
 - **2026-10-06 (Phase 3):** Weapons are named from the **item definition index** (table in `game/weapon.cpp`), not the
   designer name, because some weapons share a designer name (USP-S / P2000). Each also gets a `WeaponClass` for the
   Phase 5 triggerbot filter.

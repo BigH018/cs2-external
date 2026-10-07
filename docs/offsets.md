@@ -102,7 +102,8 @@ The code uses the **dump values**; the signatures are the cross-check (and the w
 ## Schema fields (`src/external/game/schema.h`)
 
 29 fields in 13 classes, copied by script from `client_dll.json` (Phase 2); `CSkeletonInstance::m_modelState` (320 =
-`0x140`) added in Phase 4, copied from the same dump (30 fields, 14 classes). Proof: the diagnostic reads each one from the live
+`0x140`) added in Phase 4, copied from the same dump (30 fields, 14 classes); `m_flFlashOverlayAlpha` (`0x1504`) and `m_flFlashMaxAlpha`
+(`0x150C`) added in Phase 5, same dump (32 fields; `--diag` 2026-10-07: live values match, all 50 checks OK). Proof: the diagnostic reads each one from the live
 schema system and compares. 2026-10-06, build 14189: **all 29 matched**. The scratch script also compared all 3013
 fields of the 469 live client classes with the dump: 0 mismatches.
 
@@ -119,13 +120,14 @@ fields of the 469 live client classes with the dump: 0 mismatches.
 | `C_BaseModelEntity` | `m_vecViewOffset` | `0xF60` | eye position |
 | `C_BasePlayerPawn` | `m_pWeaponServices` / `m_hController` | `0x12F0` / `0x14BC` | weapon, owner |
 | `CPlayer_WeaponServices` | `m_hActiveWeapon` | `0x60` | weapon |
-| `C_CSPlayerPawnBase` | `m_flFlashDuration` | `0x1510` | triggerbot "not while flashed" |
+| `C_CSPlayerPawnBase` | `m_flFlashOverlayAlpha` / `m_flFlashMaxAlpha` | `0x1504` / `0x150C` | triggerbot "not while flashed" (Phase 5: flashed = alpha > half of max) |
+| | `m_flFlashDuration` | `0x1510` | (kept for reference; the alpha pair is what's used) |
 | `C_CSPlayerPawn` | `m_entitySpottedState` | `0x1E88` | visibility heuristic |
 | | `m_bIsScoped` | `0x1EA0` | ESP scoped indicator, triggerbot "only when scoped" |
 | | `m_iShotsFired` | `0x1EB4` | triggerbot burst counting |
 | | `m_ArmorValue` | `0x1ECC` | ESP |
 | | `m_angEyeAngles` | `0x35F0` | aimbot |
-| | `m_iIDEntIndex` | `0x36CC` | triggerbot (entity under the crosshair) |
+| | `m_iIDEntIndex` | `0x36CC` | triggerbot (entity under the crosshair = the pawn's entity index, proven 2026-10-07) |
 | `EntitySpottedState_t` | `m_bSpotted` / `m_bSpottedByMask` | `0x8` / `0xC` | visibility heuristic (bit per player slot) |
 | `CBasePlayerController` | `m_hPawn` / `m_iszPlayerName` | `0x6BC` / `0x6FC` | name |
 | `CCSPlayerController` | `m_hPlayerPawn` / `m_bPawnIsAlive` | `0x92C` / `0x934` | controller → pawn |
@@ -237,7 +239,7 @@ Not in any dump. Found 2026-10-06 (build 14189, de_mirage bot match) with a read
 | 2, 3, 4 | spine | up 38.1, 42.1, 46.7 |
 | 5 | neck | -2.1 / 3.5 / 53.0 |
 | 6 | **head** | 0.6 / 1.8 / 58.7 |
-| 7 | face / eyes (27 looks from here) | 4.7 / 0.1 / 62.4 |
+| 7 | **middle of the head** (`kHeadCentre`; 27 looks from here) | 4.7 / 0.1 / 62.4 |
 | 9, 10, 11 | left shoulder, elbow, hand | left +9.7 → hand 17 forward (holding the gun) |
 | 13, 14, 15 | right shoulder, elbow, hand | left -5.3 → hand 16 forward |
 | 17, 18, 19 | left hip, knee, foot | up 33.6, 19.4, 2.9 |
@@ -245,6 +247,14 @@ Not in any dump. Found 2026-10-06 (build 14189, de_mirage bot match) with a read
 
 The often-published CS2 list (legs at 22-27) does not match this build. `read_bones` reads bones 0..22 (736 bytes, one
 read) and rejects the array if a bone is non-finite or > 200 units from the feet.
+
+**Head centre (2026-10-07, build 14189):** the user reported the head circle sitting on the neck / shoulders. Bone 6
+is the head *joint*: the base of the skull, ~4 units below eye height. Proof: bones 5, 6 and 7 projected onto a
+screenshot of a bot in plain view (de_mirage, ~250 units away): 6 lands on the jaw, 7 inside the head, a little below
+its middle; across 20 bots, 7 is always at eye height (±0.2) and 4.6 units forward of the body. A circle of radius 6.5
+around bone 7 covers the head from crown to chin. So the head circle, head aim and the triggerbot's head check use bone
+7 (`maths::bone::kHeadCentre`, `PlayerSnapshot::head_position()`); the skeleton still ends at the joint (6). Not an
+offset change: no dumped or hand-found offset moved, only which bone is called "the head".
 
 Proof in the tool: `--diag` "Bones (model state + 0x80)": all alive players have bones, head bone 30-80 units above
 the feet (read: 20 of 20, 52 to 60). Screenshot 2026-10-06: every skeleton drawn inside its box, head circle on the
@@ -259,9 +269,33 @@ head, feet on the box's bottom edge.
 → x 1032; 1000 units behind → w = -1000. So: pitch positive = looking down, screen y grows downwards, w < 0 behind.
 The matrix and points are in `tests/maths/test_projection.cpp`.
 
-## Spotted-by mask (`game/visibility`), **unverified in-game**
+## Spotted-by mask (`game/visibility`)
 
 `C_CSPlayerPawn::m_entitySpottedState` (`0x1E88`) + `EntitySpottedState_t::m_bSpottedByMask` (`0xC`): uint32[2], read
 as one uint64; bit n = player slot n = controller index n + 1. 2026-10-06: every pawn's mask and `m_bSpotted` read 0,
 consistent with what the screen showed (no bot in line of sight from the player's spot, no enemy dots on the radar),
 but the bit numbering (slot = index − 1) could not be checked with a visible bot. Check it with a bot in plain view.
+
+**Verified 2026-10-07:** with one bot in plain view (controller 30) and four others behind walls, only controller 30's
+mask had a bit set: `00000001` = bit 0 = slot 0 = our controller (index 1). The others read 0. Slot = index − 1 holds.
+
+## Writes (`game/writes`, values in `offsets::layout::kButton*`, Phase 5)
+
+The only game writes the tool makes. Each is one field in client.dll's data; no code is patched. The handle gets
+`PROCESS_VM_WRITE | PROCESS_VM_OPERATION` in overlay mode only (`core::kReadWriteAccess`); `--diag` and `--live` stay
+read-only.
+
+- **Button state** (`client.dll + buttons::*`, uint32): **65537** = pressed, **256** = released. Proven 2026-10-06
+  (previous session, offline bot match): 65537 on `jump` made the local player jump (vertical velocity 286, +52 units),
+  256 let go; one 30 ms press of `attack` fired one round (clip 30 → 29), three taps fired three, even a 10 ms press
+  fired. At rest the bytes read `00 01 00 01`; after our release `00 01 00 00`, which the game accepts. The triggerbot
+  holds attack for `config::kTriggerTapMs` (30 ms) per shot and writes only on a change; it skips a release while the
+  user holds Mouse 1 so it never cancels their own fire.
+- **View angles** (`client.dll + dwViewAngles`, float pitch, yaw, roll; only pitch and yaw written, normalized first).
+  Proven 2026-10-06: yaw + 10 / pitch − 5 showed up in `m_angEyeAngles` within 200 ms; writing the old values back
+  restored the view. 2026-10-07: 20 alternating writes 100 ms apart and 20 writes 10 ms apart all stuck (40/40). One
+  isolated restore write in an earlier script didn't take (cause unknown); the aimbot rewrites every frame, so a lost
+  write costs one frame.
+- **`m_iIDEntIndex`** (2026-10-07): view angles written to look at a bot's head (bone 7) → the local pawn's
+  `m_iIDEntIndex` read **211**, that bot's pawn entity index (`m_hPlayerPawn & 0x7FFF`); 15° to the side → **-1**. The
+  view was restored afterwards. So the triggerbot compares it with `PlayerSnapshot::pawn_index`.

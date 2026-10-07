@@ -245,3 +245,49 @@ and snaplines on all 19 bots, the skeletons inside their boxes; the ESP page ren
 bones: ~0.37 ms per snapshot.
 **Not exercised in-game:** the visible colour (no bot in line of sight), SCOPED (bots had pistols), moving or dead
 bots, other resolutions, a map change.
+
+## 2026-10-07: Phase 5, aimbot + triggerbot
+
+Started in autonomous mode the night before; the session ran out of context mid-phase without a `HANDOFF.md`. This
+session picked up from the uncommitted tree (angles, aimbot, targeting, writes, settings and a key list existed; the
+triggerbot, the frame wiring, the pages, the tests and the project entries didn't, and `esp_page.cpp` still used the
+old `esp.team_mode`, so the tree didn't build). The user switched autonomous mode **off** partway through.
+
+**User feedback on Phases 3-4:** everything works except the ESP head circle, which sat on the neck / shoulders.
+
+**Head fix (proven live, build 14189):** bone 6 is the head joint at the base of the skull (~4 units below the eyes);
+projected onto a screenshot of a bot in plain view it lands on the jaw. Bone 7 sits at eye height, 4.6 units forward,
+inside the head. The head circle (now radius 6.5), head aim and the triggerbot's head check use bone 7
+(`maths::bone::kHeadCentre`); the skeleton keeps bone 6. No offset changed.
+
+**Proven live along the way**
+- Spotted-by bit: with one bot in view, only its mask had bit 0 (our slot) set. Phase 4's open item is closed.
+- `m_iIDEntIndex` = the target pawn's entity index (211 on the head, -1 fifteen degrees off). View restored.
+- View-angle writes stick (40/40 at 100 ms and 10 ms intervals).
+
+**Built**
+- `maths/angles` (normalize, calc_aim_angles, angular distance, frame-rate-independent smoothing, step_towards,
+  forward, distance_to_ray), `features/targeting` (shared enemy / live / visible / distance checks, now also used by
+  the ESP), `features/aimbot` (aim point head / body / nearest, candidates, priority, compute_aim, FOV circle),
+  `features/triggerbot` (target + block reasons, the firing state machine: reaction, single / burst / hold, shot
+  delay), `features/activation` (hold / toggle), `game/writes` (button state, view angles), `input/keys` (the keys a
+  feature can use until Phase 7).
+- Settings: `GeneralSettings::team_mode` (shared by every feature), `AimbotSettings`, `TriggerbotSettings`.
+- Pages: Aimbot and Triggerbot with every option and a live status line; `ui/pages/controls` shared by the feature
+  pages (team mode on each).
+- `app/frame`: polls the aim / trigger keys, aims and fires only while the game is in front and the menu is closed,
+  writes attack only on a change, lets go of attack when the overlay hides or the tool exits; FOV circle; watermark
+  lists Aimbot / Triggerbot. The overlay opens a read-write handle; `--diag` and `--live` stay read-only.
+- Snapshot: `pawn_index`, `LocalState` (crosshair entity, flash alpha, view angles). Two schema fields from the dump
+  (`m_flFlashOverlayAlpha`, `m_flFlashMaxAlpha`), checked by `--diag` (50 checks).
+- Tests: angles, aimbot, triggerbot (state machine timings for each fire mode), writes, settings, head circle on bone
+  7; `helpers/fake_game.h`. 125 cases / 2143 assertions.
+
+**Problems and fixes**
+- A Python heredoc edit of `external.vcxproj` turned `features\aimbot` into `features<BEL>imbot` (the known backslash
+  collapse); the file was restored with git and edited with the Edit tool.
+
+**Verified here:** Debug and Release build with zero warnings; tests 125/125 in both; `--diag` all 50 checks OK.
+**Not verified (needs the user in-game):** the aimbot and triggerbot running inside the overlay (aiming, smoothing
+feel, FOV circle size, every triggerbot option), the pages' layout.
+**User check (2026-10-07):** aimbot, triggerbot and the fixed head circle all good in-game; approved for commit.
